@@ -1,0 +1,6 @@
+{
+  "name": "Daily Pay - Ads Earning & Deposit Platform",
+  "description": "Online earning platform with 2-month subscription plans (150, 300, 450 PKR), daily 2-ad watching rewards, bonus system, and JazzCash, EasyPaisa, OPay, and Card deposit/withdrawal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
