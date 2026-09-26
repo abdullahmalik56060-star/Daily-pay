@@ -59,7 +59,7 @@ interface AppContextType {
   user: UserProfile;
   // User Authentication & Registration System
   isLoggedIn: boolean;
-  loginUser: (identifier: string, password: string) => { success: boolean; message: string };
+  loginUser: (identifier: string, password: string) => Promise<{ success: boolean; message: string }>;
   registerUser: (data: {
     firstName: string;
     lastName: string;
@@ -67,7 +67,7 @@ interface AppContextType {
     phone: string;
     password: string;
     referralCode?: string;
-  }) => { success: boolean; message: string };
+  }) => Promise<{ success: boolean; message: string }>;
   logoutUser: () => void;
   registeredUsers: RegisteredUser[];
   isAuthModalOpen: boolean;
@@ -182,6 +182,39 @@ export const WITHDRAWAL_INTERVAL_DAYS = 4;
 export const WITHDRAWAL_INTERVAL_MS = 4 * 24 * 60 * 60 * 1000;
 
 const STORAGE_KEY = 'dailypay_earnings_state_v2';
+const SESSION_KEY = 'dailypay_session_user_id';
+const getUserKey = (uid: string, key: string) => `dailypay_u_${uid}_${key}`;
+
+export const GUEST_USER: UserProfile = {
+  name: 'Guest Member',
+  firstName: '',
+  lastName: '',
+  phone: '',
+  email: '',
+  password: '',
+  referralCode: '',
+  joinedDate: '',
+};
+
+// Cleanup old legacy shared global keys on fresh unauthenticated visitor sessions
+try {
+  const existingSession = localStorage.getItem(SESSION_KEY);
+  if (!existingSession) {
+    localStorage.removeItem(`${STORAGE_KEY}_user`);
+    localStorage.removeItem(`${STORAGE_KEY}_isLoggedIn`);
+    localStorage.removeItem(`${STORAGE_KEY}_balance`);
+    localStorage.removeItem(`${STORAGE_KEY}_totalEarned`);
+    localStorage.removeItem(`${STORAGE_KEY}_totalDeposited`);
+    localStorage.removeItem(`${STORAGE_KEY}_totalWithdrawn`);
+    localStorage.removeItem(`${STORAGE_KEY}_activePlan`);
+    localStorage.removeItem(`${STORAGE_KEY}_transactions`);
+    localStorage.removeItem(`${STORAGE_KEY}_deposits`);
+    localStorage.removeItem(`${STORAGE_KEY}_withdrawals`);
+    localStorage.removeItem(`${STORAGE_KEY}_referralFriends`);
+    localStorage.removeItem(`${STORAGE_KEY}_supportMessages`);
+    localStorage.removeItem(`${STORAGE_KEY}_registeredUsers`);
+  }
+} catch (e) {}
 
 const getTodayDateStr = () => {
   const d = new Date();
@@ -193,46 +226,81 @@ export const AppContext = createContext<AppContextType | null>(null);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const todayStr = getTodayDateStr();
 
-  // Initial State Loading from LocalStorage (000 for guest/new visitors, bonus credited on sign up)
+  // Active Session User ID (null for new visitor / new mobile / logged out)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
+    return localStorage.getItem(SESSION_KEY) || null;
+  });
+
+  // User Authentication State: strictly false on new browser/device
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return Boolean(localStorage.getItem(SESSION_KEY));
+  });
+
+  const [user, setUser] = useState<UserProfile>(() => {
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (sId) {
+      const saved = localStorage.getItem(getUserKey(sId, 'profile'));
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {}
+      }
+    }
+    return GUEST_USER;
+  });
+
+  // Wallet Balance (0 for new/guest visitors, personal balance when logged in)
   const [balance, setBalance] = useState<number>(() => {
-    const savedLoggedIn = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`) === 'true';
-    if (!savedLoggedIn) return 0; // Guest visitor sees 0.00
-    const saved = localStorage.getItem(`${STORAGE_KEY}_balance`);
-    return saved !== null ? Number(saved) : 0;
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (!sId) return 0;
+    const saved = localStorage.getItem(getUserKey(sId, 'balance'));
+    return saved !== null && !isNaN(Number(saved)) ? Number(saved) : 0;
   });
 
   const [totalEarned, setTotalEarned] = useState<number>(() => {
-    const savedLoggedIn = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`) === 'true';
-    if (!savedLoggedIn) return 0;
-    const saved = localStorage.getItem(`${STORAGE_KEY}_totalEarned`);
-    return saved !== null ? Number(saved) : 0;
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (!sId) return 0;
+    const saved = localStorage.getItem(getUserKey(sId, 'totalEarned'));
+    return saved !== null && !isNaN(Number(saved)) ? Number(saved) : 0;
   });
 
   const [totalDeposited, setTotalDeposited] = useState<number>(() => {
-    const savedLoggedIn = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`) === 'true';
-    if (!savedLoggedIn) return 0;
-    const saved = localStorage.getItem(`${STORAGE_KEY}_totalDeposited`);
-    return saved !== null ? Number(saved) : 0;
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (!sId) return 0;
+    const saved = localStorage.getItem(getUserKey(sId, 'totalDeposited'));
+    return saved !== null && !isNaN(Number(saved)) ? Number(saved) : 0;
   });
 
   const [totalWithdrawn, setTotalWithdrawn] = useState<number>(() => {
-    const savedLoggedIn = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`) === 'true';
-    if (!savedLoggedIn) return 0;
-    const saved = localStorage.getItem(`${STORAGE_KEY}_totalWithdrawn`);
-    return saved !== null ? Number(saved) : 0;
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (!sId) return 0;
+    const saved = localStorage.getItem(getUserKey(sId, 'totalWithdrawn'));
+    return saved !== null && !isNaN(Number(saved)) ? Number(saved) : 0;
   });
 
   const [activePlan, setActivePlan] = useState<UserSubscription | null>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_activePlan`);
-    return saved ? JSON.parse(saved) : null;
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (!sId) return null;
+    const saved = localStorage.getItem(getUserKey(sId, 'activePlan'));
+    if (!saved) return null;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return null;
+    }
   });
 
   const [dailyAds, setDailyAds] = useState<DailyAdStatus>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_dailyAds`);
-    if (saved) {
-      const parsed: DailyAdStatus = JSON.parse(saved);
-      if (parsed.date === todayStr) {
-        return parsed;
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (sId) {
+      const saved = localStorage.getItem(getUserKey(sId, 'dailyAds'));
+      if (saved) {
+        try {
+          const parsed: DailyAdStatus = JSON.parse(saved);
+          if (parsed.date === todayStr) {
+            return parsed;
+          }
+        } catch {}
       }
     }
     return {
@@ -243,7 +311,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const [dailyCheckInClaimed, setDailyCheckInClaimed] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_checkin_${todayStr}`);
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (!sId) return false;
+    const saved = localStorage.getItem(getUserKey(sId, `checkin_${todayStr}`));
     return saved === 'true';
   });
 
@@ -259,64 +329,63 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return SPONSORED_ADS;
   });
 
-  const DEFAULT_REGISTERED_USERS: RegisteredUser[] = [
-    {
-      id: 'usr_default_1',
-      firstName: 'Abdullah',
-      lastName: 'Malik',
-      name: 'Abdullah Malik',
-      email: 'user@dailypay.pk',
-      phone: '03001234567',
-      password: 'password123',
-      referralCode: 'DP-786',
-      joinedDate: '2026-09-10',
-    },
-    {
-      id: 'usr_default_2',
-      firstName: 'Hamza',
-      lastName: 'Ali',
-      name: 'Hamza Ali',
-      email: 'hamza@dailypay.pk',
-      phone: '03225290908',
-      password: 'password123',
-      referralCode: 'DP-1002',
-      joinedDate: '2026-09-15',
-    },
-  ];
+  // Registered users list: NO hardcoded users
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]);
 
-  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_registeredUsers`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return DEFAULT_REGISTERED_USERS;
-  });
-
-  // User Authentication State: Default to FALSE so visitor must signup or login first!
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`);
-    return saved === 'true';
-  });
-
-  const [user, setUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_user`);
+  // User-scoped Transactions: empty for new users
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (!sId) return [];
+    const saved = localStorage.getItem(getUserKey(sId, 'transactions'));
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch {}
     }
-    return {
-      name: 'Guest Member',
-      firstName: '',
-      lastName: '',
-      phone: '',
-      email: '',
-      password: '',
-      referralCode: '',
-      joinedDate: getTodayDateStr(),
-    };
+    return [];
+  });
+
+  // User-scoped Deposits: empty for new users
+  const [deposits, setDeposits] = useState<DepositRecord[]>(() => {
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (!sId) return [];
+    const saved = localStorage.getItem(getUserKey(sId, 'deposits'));
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    return [];
+  });
+
+  // User-scoped Withdrawals: empty for new users
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>(() => {
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (!sId) return [];
+    const saved = localStorage.getItem(getUserKey(sId, 'withdrawals'));
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    return [];
+  });
+
+  // Platform-wide records for Admin Portal
+  const [platformWithdrawals, setPlatformWithdrawals] = useState<WithdrawalRecord[]>([]);
+  const [platformDeposits, setPlatformDeposits] = useState<DepositRecord[]>([]);
+
+  // User-scoped Referral Friends: empty for new users (no hardcoded friends)
+  const [referralFriends, setReferralFriends] = useState<ReferralFriend[]>(() => {
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (!sId) return [];
+    const saved = localStorage.getItem(getUserKey(sId, 'referralFriends'));
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    return [];
   });
 
   // URL query parameter referral & auth detection
@@ -329,20 +398,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
-  // When user clicks the link, prompt Signup/Login modal first if not authenticated
+  // When website is opened on a new mobile/browser without session, show Login/Register screen first!
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => {
-    try {
-      const savedLoggedIn = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`);
-      if (savedLoggedIn !== 'true') {
-        return true; // Prompt Signup or Login first on initial link visit!
-      }
-      const params = new URLSearchParams(window.location.search);
-      const hasRef = !!(params.get('ref') || params.get('referral'));
-      const hasAuth = !!(params.get('auth') || params.get('action'));
-      return hasRef || hasAuth;
-    } catch {
-      return true;
-    }
+    const sId = localStorage.getItem(SESSION_KEY);
+    return !sId;
   });
 
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>(() => {
@@ -353,22 +412,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch {
       return 'signup';
     }
-  });
-
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_transactions`);
-    if (saved) return JSON.parse(saved);
-    return [];
-  });
-
-  const [deposits, setDeposits] = useState<DepositRecord[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_deposits`);
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_withdrawals`);
-    return saved ? JSON.parse(saved) : [];
   });
 
   // Base platform community benchmarks (PKR)
@@ -406,45 +449,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const closeFinanceLedger = () => {
     setIsFinanceLedgerOpen(false);
   };
-
-  // Referral friends list (Friends stay in demo mode until they choose a plan)
-  const [referralFriends, setReferralFriends] = useState<ReferralFriend[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_referralFriends`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // ignore
-      }
-    }
-    return [
-      {
-        id: 'ref-1',
-        name: 'Ali Khan',
-        phone: '0301-4455667',
-        joinedDate: '2026-09-12',
-        status: 'active',
-        planName: 'Plan 1 (Rs 150)',
-        bonusEarned: REFERRAL_BONUS,
-      },
-      {
-        id: 'ref-2',
-        name: 'Usman Tariq',
-        phone: '0322-9988771',
-        joinedDate: '2026-09-14',
-        status: 'demo_inactive',
-        bonusEarned: 0,
-      },
-      {
-        id: 'ref-3',
-        name: 'Hamza Bilal',
-        phone: '0345-1122334',
-        joinedDate: '2026-09-14',
-        status: 'demo_inactive',
-        bonusEarned: 0,
-      },
-    ];
-  });
 
   // WhatsApp and YouTube Channel Link states
   const [whatsappLink, setWhatsappLinkState] = useState<string>(() => {
@@ -513,36 +517,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('Official YouTube channel link updated successfully!');
   };
 
-  // Support Team Messages
+  // Support Team Messages (Scoped to user, empty initially)
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_supportMessages`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // ignore
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (sId) {
+      const saved = localStorage.getItem(getUserKey(sId, 'supportMessages'));
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {
+          // ignore
+        }
       }
     }
-    return [
-      {
-        id: 'sup-init-1',
-        ticketId: 'TKT-9482',
-        name: 'Abdullah Malik',
-        phone: '0300-1234567',
-        subject: 'General Welcome & Help',
-        message: 'Assalam o Alaikum, mujhe janna hai ke ads dekh kar daily kitni earning ho sakti hai?',
-        date: 'Today, 10:30 AM',
-        status: 'replied',
-        reply:
-          'Walekum Assalam! Plan 1 (Rs 150) se daily Rs 50 (25+25 Rs), Plan 2 (Rs 300) se daily Rs 100, aur Plan 3 (Rs 450) se daily Rs 150 earning hoti hai. Daily sirf 2 YouTube ads dekhni hoti hain. Koi bhi masla ho to aap humare WhatsApp par bhi rabta kar sakte hain!',
-        repliedAt: 'Today, 10:32 AM',
-      },
-    ];
+    return [];
   });
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_supportMessages`, JSON.stringify(supportMessages));
-  }, [supportMessages]);
 
   const sendSupportMessage = (payload: {
     name: string;
@@ -617,118 +606,62 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsAuthModalOpen(false);
   };
 
-  const loginUser = (identifier: string, pass: string): { success: boolean; message: string } => {
-    const cleanId = identifier.trim().toLowerCase();
-    const cleanPhoneDigits = cleanId.replace(/[^0-9]/g, '');
-
-    // Search for match in registered users
-    const matchedUser = registeredUsers.find((u) => {
-      const uEmail = (u.email || '').toLowerCase().trim();
-      const uPhoneDigits = (u.phone || '').replace(/[^0-9]/g, '');
-      const emailMatches = uEmail === cleanId;
-      const phoneMatches =
-        cleanPhoneDigits.length >= 10 &&
-        (uPhoneDigits.endsWith(cleanPhoneDigits.slice(-10)) || cleanPhoneDigits.endsWith(uPhoneDigits.slice(-10)));
-      return emailMatches || phoneMatches;
-    });
-
-    if (matchedUser) {
-      if (matchedUser.password && matchedUser.password !== pass) {
-        return { success: false, message: 'غلط پاس ورڈ! براہ کرم درست پاس ورڈ درج کریں۔' };
-      }
-      const updatedProfile: UserProfile = {
-        name: matchedUser.name,
-        firstName: matchedUser.firstName,
-        lastName: matchedUser.lastName,
-        email: matchedUser.email,
-        phone: matchedUser.phone,
-        password: matchedUser.password,
-        referralCode: matchedUser.referralCode,
-        joinedDate: matchedUser.joinedDate,
-      };
-      setUser(updatedProfile);
-      localStorage.setItem(`${STORAGE_KEY}_user`, JSON.stringify(updatedProfile));
-      setIsLoggedIn(true);
-      localStorage.setItem(`${STORAGE_KEY}_isLoggedIn`, 'true');
-      
-      const savedBal = localStorage.getItem(`${STORAGE_KEY}_balance`);
-      if (savedBal !== null && !isNaN(Number(savedBal))) {
-        setBalance(Number(savedBal));
-      } else {
-        setBalance(LOGIN_BONUS);
-        localStorage.setItem(`${STORAGE_KEY}_balance`, LOGIN_BONUS.toString());
-      }
-      const savedEarned = localStorage.getItem(`${STORAGE_KEY}_totalEarned`);
-      if (savedEarned !== null && !isNaN(Number(savedEarned))) {
-        setTotalEarned(Number(savedEarned));
-      } else {
-        setTotalEarned(LOGIN_BONUS);
-        localStorage.setItem(`${STORAGE_KEY}_totalEarned`, LOGIN_BONUS.toString());
-      }
-
-      showToast(`خوش آمدید ${matchedUser.firstName}! آپ کامیابی سے لاگ ان ہو چکے ہیں۔`);
-      return { success: true, message: `خوش آمدید ${matchedUser.firstName}!` };
+  const loginUser = async (identifier: string, pass: string): Promise<{ success: boolean; message: string }> => {
+    const cleanId = identifier.trim();
+    if (!cleanId) {
+      return { success: false, message: 'ای میل یا موبائل فون نمبر درج کریں۔' };
+    }
+    if (!pass) {
+      return { success: false, message: 'پاس ورڈ درج کریں۔' };
     }
 
-    // Friendly auto-account creation/demo login if credentials look valid
-    if (identifier.trim().length >= 4 && pass.length >= 4) {
-      const isEmail = identifier.includes('@');
-      const prefix = isEmail ? identifier.split('@')[0] : 'Member';
-      const capName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
-      const newRegUser: RegisteredUser = {
-        id: `usr_${Date.now()}`,
-        firstName: capName,
-        lastName: 'User',
-        name: `${capName} User`,
-        email: isEmail ? identifier.trim() : `${cleanPhoneDigits || 'user'}@dailypay.pk`,
-        phone: !isEmail ? identifier.trim() : '03001234567',
-        password: pass,
-        referralCode: `DP-${Math.floor(1000 + Math.random() * 9000)}`,
-        joinedDate: getTodayDateStr(),
-      };
-      const updatedList = [newRegUser, ...registeredUsers];
-      setRegisteredUsers(updatedList);
-      localStorage.setItem(`${STORAGE_KEY}_registeredUsers`, JSON.stringify(updatedList));
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: cleanId, password: pass }),
+      });
 
-      const updatedProfile: UserProfile = {
-        name: newRegUser.name,
-        firstName: newRegUser.firstName,
-        lastName: newRegUser.lastName,
-        email: newRegUser.email,
-        phone: newRegUser.phone,
-        password: newRegUser.password,
-        referralCode: newRegUser.referralCode,
-        joinedDate: newRegUser.joinedDate,
-      };
-      setUser(updatedProfile);
-      localStorage.setItem(`${STORAGE_KEY}_user`, JSON.stringify(updatedProfile));
+      const res = await response.json();
+      if (!res.success) {
+        return { success: false, message: res.message || 'لاگ ان کی معلومات درست نہیں ہیں۔' };
+      }
+
+      const loggedUser: UserProfile = res.user;
+      const uData = res.data;
+
+      setCurrentUserId(loggedUser.id || res.token);
+      localStorage.setItem(SESSION_KEY, loggedUser.id || res.token);
+      setUser(loggedUser);
       setIsLoggedIn(true);
-      localStorage.setItem(`${STORAGE_KEY}_isLoggedIn`, 'true');
 
-      // Set initial login bonus
-      setBalance(LOGIN_BONUS);
-      setTotalEarned(LOGIN_BONUS);
-      localStorage.setItem(`${STORAGE_KEY}_balance`, LOGIN_BONUS.toString());
-      localStorage.setItem(`${STORAGE_KEY}_totalEarned`, LOGIN_BONUS.toString());
+      setBalance(uData.balance ?? 0);
+      setTotalEarned(uData.totalEarned ?? 0);
+      setTotalDeposited(uData.totalDeposited ?? 0);
+      setTotalWithdrawn(uData.totalWithdrawn ?? 0);
+      setActivePlan(uData.activePlan || null);
+      if (uData.dailyAds) setDailyAds(uData.dailyAds);
+      setTransactions(uData.transactions || []);
+      setDeposits(uData.deposits || []);
+      setWithdrawals(uData.withdrawals || []);
+      setReferralFriends(uData.referralFriends || []);
+      setSupportMessages(uData.supportMessages || []);
 
-      showToast(`خوش آمدید ${updatedProfile.name}! 25 روپے بونس آپ کے اکاؤنٹ میں شامل ہو گیا۔`);
-      return { success: true, message: `خوش آمدید ${updatedProfile.name}!` };
+      showToast(`خوش آمدید ${loggedUser.firstName || loggedUser.name}! آپ کامیابی سے لاگ ان ہو چکے ہیں۔`);
+      return { success: true, message: res.message };
+    } catch {
+      return { success: false, message: 'سرور سے رابطہ نہ ہو سکا۔ برائے مہربانی اپنا انٹرنیٹ کنکشن چیک کریں۔' };
     }
-
-    return {
-      success: false,
-      message: 'درست ای میل یا فون نمبر اور پاس ورڈ درج کریں، یا Sign Up پر جا کر نیا اکاؤنٹ بنائیں۔',
-    };
   };
 
-  const registerUser = (data: {
+  const registerUser = async (data: {
     firstName: string;
     lastName: string;
     email: string;
     phone: string;
     password: string;
     referralCode?: string;
-  }): { success: boolean; message: string } => {
+  }): Promise<{ success: boolean; message: string }> => {
     const fName = data.firstName.trim();
     const lName = data.lastName.trim();
     const fullName = `${fName} ${lName}`.trim() || fName;
@@ -739,7 +672,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return { success: false, message: 'پہلا نام (First Name) درج کرنا لازمی ہے۔' };
     }
     if (!lName) {
-      return { success: false, message: 'دوسرا نام (2nd Name) درج کرنا لازمی ہے۔' };
+      return { success: false, message: 'دوسرا نام (Last Name) درج کرنا لازمی ہے۔' };
     }
     if (!cleanEmail || !cleanEmail.includes('@')) {
       return { success: false, message: 'درست ای میل ایڈریس درج کریں۔ (Valid email required)' };
@@ -752,86 +685,112 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return { success: false, message: 'پاس ورڈ کم از کم 4 حروف کا ہونا چاہیے۔' };
     }
 
-    // Check duplicate
-    const duplicate = registeredUsers.some(
-      (u) =>
-        u.email.toLowerCase() === cleanEmail ||
-        u.phone.replace(/[^0-9]/g, '').endsWith(digits.slice(-10))
-    );
-    if (duplicate) {
-      return {
-        success: false,
-        message: 'یہ ای میل یا فون نمبر پہلے سے رجسٹرڈ ہے۔ براہ کرم لاگ ان کریں۔ (Already registered, please login)',
-      };
-    }
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: fName,
+          lastName: lName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          password: data.password,
+          referralCode: data.referralCode?.trim(),
+        }),
+      });
 
-    const newCode = `DP-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newRegUser: RegisteredUser = {
-      id: `usr_${Date.now()}`,
-      firstName: fName,
-      lastName: lName,
-      name: fullName,
-      email: cleanEmail,
-      phone: cleanPhone,
-      password: data.password,
-      referralCode: newCode,
-      joinedDate: getTodayDateStr(),
-    };
+      const res = await response.json();
+      if (!res.success) {
+        return { success: false, message: res.message || 'رجسٹریشن ناکام رہی۔' };
+      }
 
-    const updatedUsers = [newRegUser, ...registeredUsers];
-    setRegisteredUsers(updatedUsers);
-    localStorage.setItem(`${STORAGE_KEY}_registeredUsers`, JSON.stringify(updatedUsers));
+      const newUser: UserProfile = res.user;
+      const initialStore = res.data;
 
-    const newProfile: UserProfile = {
-      name: fullName,
-      firstName: fName,
-      lastName: lName,
-      email: cleanEmail,
-      phone: cleanPhone,
-      password: data.password,
-      referralCode: newCode,
-      referredBy: data.referralCode?.trim() || undefined,
-      joinedDate: getTodayDateStr(),
-    };
-    setUser(newProfile);
-    localStorage.setItem(`${STORAGE_KEY}_user`, JSON.stringify(newProfile));
-    setIsLoggedIn(true);
-    localStorage.setItem(`${STORAGE_KEY}_isLoggedIn`, 'true');
+      setCurrentUserId(newUser.id || res.token);
+      localStorage.setItem(SESSION_KEY, newUser.id || res.token);
+      setUser(newUser);
+      setIsLoggedIn(true);
 
-    // Credit Welcome Signup Bonus Rs 25
-    setBalance(LOGIN_BONUS);
-    setTotalEarned(LOGIN_BONUS);
-    localStorage.setItem(`${STORAGE_KEY}_balance`, LOGIN_BONUS.toString());
-    localStorage.setItem(`${STORAGE_KEY}_totalEarned`, LOGIN_BONUS.toString());
-    const bonusTx: Transaction = {
-      id: `tx-welcome-${Date.now()}`,
-      type: 'signup_bonus',
-      title: 'Welcome Sign-up Bonus',
-      amount: LOGIN_BONUS,
-      isCredit: true,
-      date: new Date().toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      status: 'success',
-      details: `Free welcome signup bonus (Rs ${LOGIN_BONUS} PKR) credited for ${fullName}`,
-    };
-    setTransactions((prev) => [bonusTx, ...prev]);
+      setBalance(initialStore.balance ?? LOGIN_BONUS);
+      setTotalEarned(initialStore.totalEarned ?? LOGIN_BONUS);
+      setTotalDeposited(0);
+      setTotalWithdrawn(0);
+      setActivePlan(null);
+      setTransactions(initialStore.transactions || []);
+      setDeposits([]);
+      setWithdrawals([]);
+      setReferralFriends([]);
+      setSupportMessages([]);
 
-    if (data.referralCode?.trim()) {
-      showToast(`🎉 مبارک ہو ${fName}! آپ کو ریفرل کوڈ کے تحت 25 روپے ویلکم بونس مل گیا!`);
-    } else {
       showToast(`🎉 مبارک ہو ${fName}! آپ کا اکاؤنٹ بن گیا اور 25 روپے ویلکم بونس والٹ میں شامل ہو گیا!`);
-    }
+      return { success: true, message: res.message };
+    } catch {
+      // Local fallback with completely isolated new ID
+      const newUserId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const newCode = `DP-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newUser: UserProfile = {
+        id: newUserId,
+        name: fullName,
+        firstName: fName,
+        lastName: lName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        password: data.password,
+        referralCode: newCode,
+        referredBy: data.referralCode?.trim() || undefined,
+        joinedDate: getTodayDateStr(),
+      };
 
-    return {
-      success: true,
-      message: `اکاؤنٹ بن گیا اور 25 روپے ویلکم بونس شامل کر دیا گیا۔`,
-    };
+      const welcomeTx: Transaction = {
+        id: `tx-welcome-${Date.now()}`,
+        type: 'signup_bonus',
+        title: 'Welcome Sign-up Bonus',
+        amount: LOGIN_BONUS,
+        isCredit: true,
+        date: new Date().toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        status: 'success',
+        details: `Free welcome signup bonus (Rs ${LOGIN_BONUS} PKR) credited for ${fullName}`,
+        userId: newUserId,
+      };
+
+      setCurrentUserId(newUserId);
+      localStorage.setItem(SESSION_KEY, newUserId);
+      setUser(newUser);
+      setIsLoggedIn(true);
+      setBalance(LOGIN_BONUS);
+      setTotalEarned(LOGIN_BONUS);
+      setTotalDeposited(0);
+      setTotalWithdrawn(0);
+      setActivePlan(null);
+      setTransactions([welcomeTx]);
+      setDeposits([]);
+      setWithdrawals([]);
+      setReferralFriends([]);
+      setSupportMessages([]);
+
+      showToast(`🎉 مبارک ہو ${fName}! آپ کا اکاؤنٹ بن گیا اور 25 روپے ویلکم بونس والٹ میں شامل ہو گیا!`);
+      return { success: true, message: 'اکاؤنٹ بن گیا اور 25 روپے ویلکم بونس شامل کر دیا گیا۔' };
+    }
   };
 
   const logoutUser = () => {
+    localStorage.removeItem(SESSION_KEY);
+    setCurrentUserId(null);
     setIsLoggedIn(false);
-    localStorage.setItem(`${STORAGE_KEY}_isLoggedIn`, 'false');
+    setUser(GUEST_USER);
     setBalance(0);
     setTotalEarned(0);
+    setTotalDeposited(0);
+    setTotalWithdrawn(0);
+    setActivePlan(null);
+    setDailyAds({ date: todayStr, ad1Watched: false, ad2Watched: false });
+    setTransactions([]);
+    setDeposits([]);
+    setWithdrawals([]);
+    setReferralFriends([]);
+    setSupportMessages([]);
+    openAuthModal('login');
     showToast('آپ کامیابی سے لاگ آؤٹ ہو چکے ہیں۔');
   };
 
@@ -1074,49 +1033,125 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     localStorage.setItem(`${STORAGE_KEY}_adminLogs`, JSON.stringify(adminLogs));
   }, [adminLogs]);
 
+  // Persist user-specific isolated state and sync with server
   useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_balance`, balance.toString());
-  }, [balance]);
+    if (!currentUserId || !isLoggedIn) return;
+    try {
+      localStorage.setItem(getUserKey(currentUserId, 'balance'), balance.toString());
+      localStorage.setItem(getUserKey(currentUserId, 'totalEarned'), totalEarned.toString());
+      localStorage.setItem(getUserKey(currentUserId, 'totalDeposited'), totalDeposited.toString());
+      localStorage.setItem(getUserKey(currentUserId, 'totalWithdrawn'), totalWithdrawn.toString());
+      localStorage.setItem(getUserKey(currentUserId, 'referralFriends'), JSON.stringify(referralFriends));
+      if (activePlan) {
+        localStorage.setItem(getUserKey(currentUserId, 'activePlan'), JSON.stringify(activePlan));
+      } else {
+        localStorage.removeItem(getUserKey(currentUserId, 'activePlan'));
+      }
+      localStorage.setItem(getUserKey(currentUserId, 'dailyAds'), JSON.stringify(dailyAds));
+      localStorage.setItem(getUserKey(currentUserId, 'transactions'), JSON.stringify(transactions));
+      localStorage.setItem(getUserKey(currentUserId, 'deposits'), JSON.stringify(deposits));
+      localStorage.setItem(getUserKey(currentUserId, 'withdrawals'), JSON.stringify(withdrawals));
+      localStorage.setItem(getUserKey(currentUserId, 'supportMessages'), JSON.stringify(supportMessages));
+      localStorage.setItem(getUserKey(currentUserId, 'profile'), JSON.stringify(user));
 
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_totalEarned`, totalEarned.toString());
-  }, [totalEarned]);
+      // Debounced background sync with server
+      const timer = setTimeout(() => {
+        fetch(`/api/user/sync/${currentUserId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            balance,
+            totalEarned,
+            totalDeposited,
+            totalWithdrawn,
+            activePlan,
+            dailyAds,
+            transactions,
+            deposits,
+            withdrawals,
+            referralFriends,
+            supportMessages,
+          }),
+        }).catch(() => {});
+      }, 500);
 
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_totalDeposited`, totalDeposited.toString());
-  }, [totalDeposited]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_totalWithdrawn`, totalWithdrawn.toString());
-  }, [totalWithdrawn]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_referralFriends`, JSON.stringify(referralFriends));
-  }, [referralFriends]);
-
-  useEffect(() => {
-    if (activePlan) {
-      localStorage.setItem(`${STORAGE_KEY}_activePlan`, JSON.stringify(activePlan));
-    } else {
-      localStorage.removeItem(`${STORAGE_KEY}_activePlan`);
+      return () => clearTimeout(timer);
+    } catch (e) {
+      console.error('Error syncing user data:', e);
     }
-  }, [activePlan]);
+  }, [
+    currentUserId,
+    isLoggedIn,
+    balance,
+    totalEarned,
+    totalDeposited,
+    totalWithdrawn,
+    activePlan,
+    dailyAds,
+    transactions,
+    deposits,
+    withdrawals,
+    referralFriends,
+    supportMessages,
+    user,
+  ]);
 
+  // Initial fetch for registered users and platform records
   useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_dailyAds`, JSON.stringify(dailyAds));
-  }, [dailyAds]);
+    // 1. Fetch platform withdrawals for admin
+    fetch('/api/withdrawals')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.withdrawals)) {
+          setPlatformWithdrawals(data.withdrawals);
+        }
+      })
+      .catch(() => {});
 
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_transactions`, JSON.stringify(transactions));
-  }, [transactions]);
+    // 2. Fetch platform deposits for admin
+    fetch('/api/deposits')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.deposits)) {
+          setPlatformDeposits(data.deposits);
+        }
+      })
+      .catch(() => {});
 
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_deposits`, JSON.stringify(deposits));
-  }, [deposits]);
+    // 3. Fetch admin registered users list
+    fetch('/api/admin/users')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.users)) {
+          setRegisteredUsers(data.users);
+        }
+      })
+      .catch(() => {});
 
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_withdrawals`, JSON.stringify(withdrawals));
-  }, [withdrawals]);
+    // 4. If current user is logged in, sync latest personal profile and data
+    const sId = localStorage.getItem(SESSION_KEY);
+    if (sId) {
+      fetch(`/api/user/data/${sId}`)
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.success && res.user && res.data) {
+            setUser(res.user);
+            setBalance(res.data.balance ?? 0);
+            setTotalEarned(res.data.totalEarned ?? 0);
+            setTotalDeposited(res.data.totalDeposited ?? 0);
+            setTotalWithdrawn(res.data.totalWithdrawn ?? 0);
+            if (res.data.activePlan) setActivePlan(res.data.activePlan);
+            if (res.data.dailyAds) setDailyAds(res.data.dailyAds);
+            if (res.data.transactions) setTransactions(res.data.transactions);
+            if (res.data.deposits) setDeposits(res.data.deposits);
+            if (res.data.withdrawals) setWithdrawals(res.data.withdrawals);
+            if (res.data.referralFriends) setReferralFriends(res.data.referralFriends);
+            if (res.data.supportMessages) setSupportMessages(res.data.supportMessages);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_adCampaigns`, JSON.stringify(adCampaigns));
@@ -1309,9 +1344,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             ...w,
             status: 'completed',
             approvedBy: currentAdminObj.name,
-            receivedAt: new Date().toLocaleDateString('en-PK', {
-              month: 'short',
-              day: 'numeric',
+            receivedAt: new Date().toLocaleTimeString('en-PK', {
               hour: '2-digit',
               minute: '2-digit',
             }),
@@ -1320,6 +1353,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return w;
       })
     );
+
+    setPlatformWithdrawals((prev) =>
+      prev.map((w) => {
+        if (w.id === withdrawalId || w.referenceId === withdrawalId) {
+          return {
+            ...w,
+            status: 'completed',
+            approvedBy: currentAdminObj.name,
+            receivedAt: new Date().toLocaleTimeString('en-PK', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          };
+        }
+        return w;
+      })
+    );
+
+    fetch('/api/withdrawals/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ withdrawalId, status: 'completed', approvedBy: currentAdminObj.name }),
+    }).catch(() => {});
 
     setTransactions((prev) =>
       prev.map((tx) =>
@@ -1675,13 +1731,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       totalCredited: totalCredit,
       senderNumber,
       transactionId,
+      userId: currentUserId || user.id,
+      userName: user.name || user.firstName,
       date: new Date().toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
       status: 'completed',
     };
 
     setDeposits((prev) => [newDeposit, ...prev]);
+    setPlatformDeposits((prev) => [newDeposit, ...prev]);
     setBalance((prev) => prev + totalCredit);
     setTotalDeposited((prev) => prev + amount);
+
+    // Sync deposit to server API
+    fetch('/api/deposits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newDeposit),
+    }).catch(() => {});
     if (bonusAmount > 0) {
       setTotalEarned((prev) => prev + bonusAmount);
     }
@@ -1855,6 +1921,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       accountNumber,
       userName: registeredName,
       userPhone: registeredPhone,
+      userId: currentUserId || user.id,
       date: new Date().toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
       timestamp: nowTime,
       status: 'pending', // User requirement: "jb log withdrawal ly wo request sambit kary or admin approve kary per withdrawal ho"
@@ -1863,17 +1930,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       estimatedReceivedTime,
     };
 
-    setBalance((prev) => {
-      const nextBal = Math.max(0, prev - amount);
-      localStorage.setItem(`${STORAGE_KEY}_balance`, nextBal.toString());
-      return nextBal;
-    });
-    setTotalWithdrawn((prev) => {
-      const nextWd = prev + amount;
-      localStorage.setItem(`${STORAGE_KEY}_totalWithdrawn`, nextWd.toString());
-      return nextWd;
-    });
+    setBalance((prev) => Math.max(0, prev - amount));
+    setTotalWithdrawn((prev) => prev + amount);
     setWithdrawals((prev) => [newWithdrawal, ...prev]);
+    setPlatformWithdrawals((prev) => [newWithdrawal, ...prev]);
+
+    // Post to server API
+    fetch('/api/withdrawals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newWithdrawal),
+    }).catch(() => {});
 
     const tx: Transaction = {
       id: `tx-wd-${Date.now()}`,
@@ -1972,16 +2039,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setDailyAds(newDailyAds);
-    setBalance((prev) => {
-      const nextBal = prev + reward;
-      localStorage.setItem(`${STORAGE_KEY}_balance`, nextBal.toString());
-      return nextBal;
-    });
-    setTotalEarned((prev) => {
-      const nextEarn = prev + reward;
-      localStorage.setItem(`${STORAGE_KEY}_totalEarned`, nextEarn.toString());
-      return nextEarn;
-    });
+    setBalance((prev) => prev + reward);
+    setTotalEarned((prev) => prev + reward);
 
     const tx: Transaction = {
       id: `tx-ad-${Date.now()}`,
@@ -2058,7 +2117,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBalance((prev) => prev + checkInBonus);
     setTotalEarned((prev) => prev + checkInBonus);
     setDailyCheckInClaimed(true);
-    localStorage.setItem(`${STORAGE_KEY}_checkin_${todayStr}`, 'true');
+    if (currentUserId) {
+      localStorage.setItem(getUserKey(currentUserId, `checkin_${todayStr}`), 'true');
+    }
 
     const tx: Transaction = {
       id: `tx-checkin-${Date.now()}`,
@@ -2253,46 +2314,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setDeposits([]);
     setWithdrawals([]);
     setAdCampaigns(SPONSORED_ADS);
-    setReferralFriends([
-      {
-        id: 'ref-1',
-        name: 'Ali Khan',
-        phone: '0301-4455667',
-        joinedDate: '2026-09-12',
-        status: 'active',
-        planName: 'Plan 1 (Rs 150)',
-        bonusEarned: REFERRAL_BONUS,
-      },
-      {
-        id: 'ref-2',
-        name: 'Usman Tariq',
-        phone: '0322-9988771',
-        joinedDate: '2026-09-14',
-        status: 'demo_inactive',
-        bonusEarned: 0,
-      },
-      {
-        id: 'ref-3',
-        name: 'Hamza Bilal',
-        phone: '0345-1122334',
-        joinedDate: '2026-09-14',
-        status: 'demo_inactive',
-        bonusEarned: 0,
-      },
-    ]);
-    setTransactions([
-      {
-        id: 'tx-welcome-1',
-        type: 'signup_bonus',
-        title: 'App Login / Sign-up Bonus',
-        amount: LOGIN_BONUS,
-        isCredit: true,
-        date: new Date().toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        status: 'success',
-        details: 'Free login app bonus (Rs 25 PKR) credited into wallet',
-      },
-    ]);
-    showToast('App state reset to fresh default demo.');
+    setReferralFriends([]);
+    setTransactions([]);
+    showToast('App state reset.');
   };
 
   const contextValue = useMemo(
@@ -2333,8 +2357,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       openAuthModal,
       closeAuthModal,
       transactions,
-      deposits,
-      withdrawals,
+      deposits: isAdminLoggedIn ? (platformDeposits.length ? platformDeposits : deposits) : deposits,
+      withdrawals: isAdminLoggedIn ? (platformWithdrawals.length ? platformWithdrawals : withdrawals) : withdrawals,
       referralFriends,
       dailyCheckInClaimed,
       whatsappLink,

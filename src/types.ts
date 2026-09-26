@@ -49,6 +49,8 @@ export interface DepositRecord {
   totalCredited: number;
   senderNumber: string;
   transactionId: string;
+  userId?: string;
+  userName?: string;
   date: string;
   status: 'completed' | 'pending';
 }
@@ -63,6 +65,7 @@ export interface WithdrawalRecord {
   accountNumber: string; // Account mobile number to send withdrawal payment to
   userName?: string; // Registered user name
   userPhone?: string; // Registered user phone number
+  userId?: string; // Registered user unique ID
   date: string;
   timestamp?: number;
   status: 'completed' | 'processing' | 'pending' | 'rejected';
@@ -133,6 +136,7 @@ export interface Transaction {
   details?: string;
   method?: PaymentMethod;
   referenceId?: string;
+  userId?: string;
 }
 
 export interface AdCampaign {
@@ -159,6 +163,7 @@ export interface AdCampaign {
 }
 
 export interface UserProfile {
+  id?: string;
   name: string;
   firstName?: string;
   lastName?: string;

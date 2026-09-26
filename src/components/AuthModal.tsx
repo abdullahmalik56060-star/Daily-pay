@@ -84,7 +84,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSignupSubmit = (e: React.FormEvent) => {
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -116,8 +116,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const res = registerUser({
+    try {
+      const res = await registerUser({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
@@ -131,14 +131,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setSuccessMsg(res.message);
         setTimeout(() => {
           onClose();
-        }, 1200);
+        }, 1000);
       } else {
         setErrorMsg(res.message);
       }
-    }, 400);
+    } catch {
+      setIsSubmitting(false);
+      setErrorMsg('رجسٹریشن کے دوران خرابی پیش آئی۔ دوبارہ کوشش کریں۔');
+    }
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -153,8 +156,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const res = loginUser(loginIdentifier.trim(), loginPassword);
+    try {
+      const res = await loginUser(loginIdentifier.trim(), loginPassword);
       setIsSubmitting(false);
 
       if (res.success) {
@@ -165,13 +168,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } else {
         setErrorMsg(res.message);
       }
-    }, 400);
-  };
-
-  const handleQuickDemoFill = () => {
-    setLoginIdentifier('03001234567');
-    setLoginPassword('password123');
-    setErrorMsg(null);
+    } catch {
+      setIsSubmitting(false);
+      setErrorMsg('لاگ ان کے دوران خرابی پیش آئی۔ دوبارہ کوشش کریں۔');
+    }
   };
 
   return (
@@ -288,7 +288,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   required
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="e.g. Abdullah"
+                  placeholder="e.g. Ali"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-emerald-500 transition-colors"
                 />
               </div>
@@ -303,7 +303,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   required
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  placeholder="e.g. Malik"
+                  placeholder="e.g. Khan"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-emerald-500 transition-colors"
                 />
               </div>
@@ -460,7 +460,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 required
                 value={loginIdentifier}
                 onChange={(e) => setLoginIdentifier(e.target.value)}
-                placeholder="مثال: 03001234567 یا user@dailypay.pk"
+                placeholder="اپنا ای میل یا فون نمبر درج کریں"
                 className="w-full px-3.5 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs sm:text-sm focus:outline-none focus:border-emerald-500 transition-colors"
               />
               <p className="text-[11px] text-slate-400 mt-1">
@@ -502,21 +502,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-            </div>
-
-            {/* Quick Demo Login Option */}
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-bold text-slate-300 block">ڈیمو ٹیسٹ اکاؤنٹ:</span>
-                <span className="text-[10px] text-slate-400 font-mono">03001234567 • pass: password123</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleQuickDemoFill}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold transition-all border border-slate-700"
-              >
-                Auto Fill
-              </button>
             </div>
 
             {/* Submit Button */}
