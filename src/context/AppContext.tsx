@@ -193,23 +193,31 @@ export const AppContext = createContext<AppContextType | null>(null);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const todayStr = getTodayDateStr();
 
-  // Initial State Loading from LocalStorage
+  // Initial State Loading from LocalStorage (000 for guest/new visitors, bonus credited on sign up)
   const [balance, setBalance] = useState<number>(() => {
+    const savedLoggedIn = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`) === 'true';
+    if (!savedLoggedIn) return 0; // Guest visitor sees 0.00
     const saved = localStorage.getItem(`${STORAGE_KEY}_balance`);
-    return saved !== null ? Number(saved) : LOGIN_BONUS; // default 25 PKR login/app bonus!
+    return saved !== null ? Number(saved) : 0;
   });
 
   const [totalEarned, setTotalEarned] = useState<number>(() => {
+    const savedLoggedIn = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`) === 'true';
+    if (!savedLoggedIn) return 0;
     const saved = localStorage.getItem(`${STORAGE_KEY}_totalEarned`);
-    return saved !== null ? Number(saved) : LOGIN_BONUS;
+    return saved !== null ? Number(saved) : 0;
   });
 
   const [totalDeposited, setTotalDeposited] = useState<number>(() => {
+    const savedLoggedIn = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`) === 'true';
+    if (!savedLoggedIn) return 0;
     const saved = localStorage.getItem(`${STORAGE_KEY}_totalDeposited`);
     return saved !== null ? Number(saved) : 0;
   });
 
   const [totalWithdrawn, setTotalWithdrawn] = useState<number>(() => {
+    const savedLoggedIn = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`) === 'true';
+    if (!savedLoggedIn) return 0;
     const saved = localStorage.getItem(`${STORAGE_KEY}_totalWithdrawn`);
     return saved !== null ? Number(saved) : 0;
   });
@@ -286,9 +294,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return DEFAULT_REGISTERED_USERS;
   });
 
+  // User Authentication State: Default to FALSE so visitor must signup or login first!
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`);
-    return saved !== null ? saved === 'true' : true;
+    return saved === 'true';
   });
 
   const [user, setUser] = useState<UserProfile>(() => {
@@ -299,14 +308,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch {}
     }
     return {
-      name: 'Abdullah Malik',
-      firstName: 'Abdullah',
-      lastName: 'Malik',
-      phone: '03001234567',
-      email: 'user@dailypay.pk',
-      password: 'password123',
-      referralCode: 'DP-786',
-      joinedDate: '2026-09-10',
+      name: 'Guest Member',
+      firstName: '',
+      lastName: '',
+      phone: '',
+      email: '',
+      password: '',
+      referralCode: '',
+      joinedDate: getTodayDateStr(),
     };
   });
 
@@ -320,14 +329,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   });
 
+  // When user clicks the link, prompt Signup/Login modal first if not authenticated
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => {
     try {
+      const savedLoggedIn = localStorage.getItem(`${STORAGE_KEY}_isLoggedIn`);
+      if (savedLoggedIn !== 'true') {
+        return true; // Prompt Signup or Login first on initial link visit!
+      }
       const params = new URLSearchParams(window.location.search);
       const hasRef = !!(params.get('ref') || params.get('referral'));
       const hasAuth = !!(params.get('auth') || params.get('action'));
       return hasRef || hasAuth;
     } catch {
-      return false;
+      return true;
     }
   });
 
@@ -344,18 +358,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_transactions`);
     if (saved) return JSON.parse(saved);
-    return [
-      {
-        id: 'tx-welcome-1',
-        type: 'signup_bonus',
-        title: 'App Login / Sign-up Bonus',
-        amount: LOGIN_BONUS,
-        isCredit: true,
-        date: new Date().toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        status: 'success',
-        details: 'Free login app bonus (Rs 25 PKR) credited into wallet',
-      },
-    ];
+    return [];
   });
 
   const [deposits, setDeposits] = useState<DepositRecord[]>(() => {
@@ -446,9 +449,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // WhatsApp and YouTube Channel Link states
   const [whatsappLink, setWhatsappLinkState] = useState<string>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_whatsappLink`);
-    // Migrate to requested primary helpline 03225290908 if empty, dummy, or old 03249154224
+    // Migrate to requested primary helpline 03706486965
     if (!saved || saved.includes('03001234567') || saved.includes('923001234567') || saved.includes('03249154224') || saved.includes('923249154224')) {
-      return 'https://wa.me/923225290908';
+      return 'https://wa.me/923706486965';
     }
     return saved;
   });
@@ -647,6 +650,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.setItem(`${STORAGE_KEY}_user`, JSON.stringify(updatedProfile));
       setIsLoggedIn(true);
       localStorage.setItem(`${STORAGE_KEY}_isLoggedIn`, 'true');
+      
+      const savedBal = localStorage.getItem(`${STORAGE_KEY}_balance`);
+      if (savedBal !== null && !isNaN(Number(savedBal))) {
+        setBalance(Number(savedBal));
+      } else {
+        setBalance(LOGIN_BONUS);
+        localStorage.setItem(`${STORAGE_KEY}_balance`, LOGIN_BONUS.toString());
+      }
+      const savedEarned = localStorage.getItem(`${STORAGE_KEY}_totalEarned`);
+      if (savedEarned !== null && !isNaN(Number(savedEarned))) {
+        setTotalEarned(Number(savedEarned));
+      } else {
+        setTotalEarned(LOGIN_BONUS);
+        localStorage.setItem(`${STORAGE_KEY}_totalEarned`, LOGIN_BONUS.toString());
+      }
+
       showToast(`خوش آمدید ${matchedUser.firstName}! آپ کامیابی سے لاگ ان ہو چکے ہیں۔`);
       return { success: true, message: `خوش آمدید ${matchedUser.firstName}!` };
     }
@@ -685,7 +704,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.setItem(`${STORAGE_KEY}_user`, JSON.stringify(updatedProfile));
       setIsLoggedIn(true);
       localStorage.setItem(`${STORAGE_KEY}_isLoggedIn`, 'true');
-      showToast(`خوش آمدید ${updatedProfile.name}!`);
+
+      // Set initial login bonus
+      setBalance(LOGIN_BONUS);
+      setTotalEarned(LOGIN_BONUS);
+      localStorage.setItem(`${STORAGE_KEY}_balance`, LOGIN_BONUS.toString());
+      localStorage.setItem(`${STORAGE_KEY}_totalEarned`, LOGIN_BONUS.toString());
+
+      showToast(`خوش آمدید ${updatedProfile.name}! 25 روپے بونس آپ کے اکاؤنٹ میں شامل ہو گیا۔`);
       return { success: true, message: `خوش آمدید ${updatedProfile.name}!` };
     }
 
@@ -773,8 +799,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     localStorage.setItem(`${STORAGE_KEY}_isLoggedIn`, 'true');
 
     // Credit Welcome Signup Bonus Rs 25
-    setBalance((prev) => prev + LOGIN_BONUS);
-    setTotalEarned((prev) => prev + LOGIN_BONUS);
+    setBalance(LOGIN_BONUS);
+    setTotalEarned(LOGIN_BONUS);
+    localStorage.setItem(`${STORAGE_KEY}_balance`, LOGIN_BONUS.toString());
+    localStorage.setItem(`${STORAGE_KEY}_totalEarned`, LOGIN_BONUS.toString());
     const bonusTx: Transaction = {
       id: `tx-welcome-${Date.now()}`,
       type: 'signup_bonus',
@@ -802,6 +830,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const logoutUser = () => {
     setIsLoggedIn(false);
     localStorage.setItem(`${STORAGE_KEY}_isLoggedIn`, 'false');
+    setBalance(0);
+    setTotalEarned(0);
     showToast('آپ کامیابی سے لاگ آؤٹ ہو چکے ہیں۔');
   };
 
@@ -1812,6 +1842,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const estimatedMinutes = 6;
     const estimatedReceivedTime = nowTime + estimatedMinutes * 60 * 1000;
 
+    const registeredName = user?.name || user?.firstName || accountTitle;
+    const registeredPhone = user?.phone || accountNumber;
+
     const newWithdrawal: WithdrawalRecord = {
       id: referenceId,
       method,
@@ -1820,6 +1853,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       netAmount,
       accountTitle,
       accountNumber,
+      userName: registeredName,
+      userPhone: registeredPhone,
       date: new Date().toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
       timestamp: nowTime,
       status: 'pending', // User requirement: "jb log withdrawal ly wo request sambit kary or admin approve kary per withdrawal ho"
@@ -1897,11 +1932,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // 4. Watch Ad action (Daily limit: 2 ads per day)
   const watchAd = (adNumber: 1 | 2) => {
+    if (!isLoggedIn) {
+      openAuthModal('signup');
+      return {
+        success: false,
+        reward: 0,
+        message: 'ایڈز دیکھ کر ارننگ حاصل کرنے کے لیے پہلے سائن اپ یا لاگ ان کریں! (Please Sign Up or Login first)',
+      };
+    }
+
+    // User requirement: "Jb plan acctive na kr ly tb tk adds nna dak sakhy"
     if (!activePlan) {
       return {
         success: false,
         reward: 0,
-        message: 'No active plan! Please subscribe to Plan 1 (150 Rs), Plan 2 (300 Rs), or Plan 3 (450 Rs) first to earn from ads.',
+        message: 'ایڈز دیکھنے اور روزانہ ارننگ حاصل کرنے کے لیے پہلے کوئی پلان ایکٹو کریں! (Please activate a plan first to watch ads)',
       };
     }
 
@@ -1914,9 +1959,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     // Determine reward based on active plan and ad number
-    // Plan 1 (150): Ad 1 = 25 Rs, Ad 2 = 25 Rs (Total 50 Rs)
-    // Plan 2 (300): Ad 1 = 50 Rs, Ad 2 = 50 Rs (Total 100 Rs)
-    // Plan 3 (450): Ad 1 = 75 Rs, Ad 2 = 75 Rs (Total 150 Rs)
+    // Plan 1 (Rs 150): 25+25, Plan 2 (Rs 300): 50+50, Plan 3 (Rs 450): 75+75
     const reward = adNumber === 1 ? activePlan.ad1Reward : activePlan.ad2Reward;
 
     const newDailyAds: DailyAdStatus = {
@@ -1929,13 +1972,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setDailyAds(newDailyAds);
-    setBalance((prev) => prev + reward);
-    setTotalEarned((prev) => prev + reward);
+    setBalance((prev) => {
+      const nextBal = prev + reward;
+      localStorage.setItem(`${STORAGE_KEY}_balance`, nextBal.toString());
+      return nextBal;
+    });
+    setTotalEarned((prev) => {
+      const nextEarn = prev + reward;
+      localStorage.setItem(`${STORAGE_KEY}_totalEarned`, nextEarn.toString());
+      return nextEarn;
+    });
 
     const tx: Transaction = {
       id: `tx-ad-${Date.now()}`,
       type: 'ad_earning',
-      title: `Ad #${adNumber} Completed (${activePlan.planName})`,
+      title: `Ad #${adNumber} Completed (${activePlan ? activePlan.planName : 'Starter Ad Task'})`,
       amount: reward,
       isCredit: true,
       date: new Date().toLocaleDateString('en-PK', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -1944,7 +1995,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     setTransactions((prev) => [tx, ...prev]);
-    showToast(`Congratulations! Rs ${reward} earned from Ad #${adNumber}!`);
+    showToast(`🎉 مبارک ہو! ایڈ #${adNumber} دیکھنے پر Rs ${reward} آپ کے اکاؤنٹ میں شامل ہو گئے!`);
 
     // Record live alert for admins
     recordUserAlert({

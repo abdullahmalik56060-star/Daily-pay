@@ -30,7 +30,7 @@ export const AdWatchModal: React.FC<AdWatchModalProps> = ({
   onClose,
   onCompleted,
 }) => {
-  const { watchAd } = useApp();
+  const { watchAd, activePlan } = useApp();
   const [secondsRemaining, setSecondsRemaining] = useState<number>(campaign.durationSeconds || 10);
   const [timerFinished, setTimerFinished] = useState<boolean>(false);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -66,6 +66,11 @@ export const AdWatchModal: React.FC<AdWatchModalProps> = ({
   );
 
   const handleVerifyAnswer = () => {
+    if (!activePlan) {
+      setQuizError('ایڈز دیکھنے اور روزانہ ارننگ حاصل کرنے کے لیے پہلے کوئی پلان ایکٹو کریں! (Please activate a plan first)');
+      return;
+    }
+
     if (selectedOption === null) {
       setQuizError('Please select an answer to verify and claim your reward.');
       return;

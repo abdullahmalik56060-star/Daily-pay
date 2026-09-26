@@ -34,6 +34,8 @@ export const DepositView: React.FC<DepositViewProps> = ({ onSuccess }) => {
     financialSummary,
     openFinanceLedger,
     communityDeposits,
+    isLoggedIn,
+    openAuthModal,
   } = useApp();
 
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('jazzcash');
@@ -63,6 +65,12 @@ export const DepositView: React.FC<DepositViewProps> = ({ onSuccess }) => {
   const handleSubmitDeposit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!isLoggedIn) {
+      openAuthModal('signup');
+      setError('براہِ کرم ڈپازٹ جمع کروانے سے پہلے سائن اپ یا لاگ ان کریں۔ (Please Sign Up or Login first)');
+      return;
+    }
 
     if (amount < 150) {
       setError('کم از کم رقم جمع کرنے کی حد 150 روپے ہے۔ (Minimum deposit limit is Rs 150. Plan Options: Rs 150, Rs 300, Rs 450).');

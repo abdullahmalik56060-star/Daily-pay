@@ -64,6 +64,9 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
     openFinanceLedger,
     communityPayouts,
     totalWithdrawn,
+    user,
+    isLoggedIn,
+    openAuthModal,
   } = useApp();
 
   const currentAdmin = admins.find((a) => a.id === currentAdminId) || admins[0];
@@ -73,10 +76,16 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
 
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('jazzcash');
   const [amount, setAmount] = useState<number>(balance >= 500 ? (balance >= 1000 ? 1000 : 500) : 500);
-  const [accountTitle, setAccountTitle] = useState<string>('Abdullah Malik');
-  const [accountNumber, setAccountNumber] = useState<string>('0300-1234567');
+  const [accountTitle, setAccountTitle] = useState<string>(user.name || '');
+  const [accountNumber, setAccountNumber] = useState<string>(user.phone || '');
   const [error, setError] = useState<string | null>(null);
   const [completedWithdrawal, setCompletedWithdrawal] = useState<WithdrawalRecord | null>(null);
+
+  // Keep account fields synced with logged in user
+  useEffect(() => {
+    if (user.name) setAccountTitle(user.name);
+    if (user.phone) setAccountNumber(user.phone);
+  }, [user]);
 
   const activePendingWithdrawal = withdrawals.find(
     (w) => w.status === 'pending' || w.status === 'processing'
@@ -119,6 +128,12 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
   const handleWithdrawSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!isLoggedIn) {
+      openAuthModal('signup');
+      setError('براہِ کرم ودڈرا کی درخواست جمع کروانے سے پہلے سائن اپ یا لاگ ان کریں۔ (Please Sign Up or Login first)');
+      return;
+    }
 
     // USER RULE: "jb tk koi plan chose na kary tb tb withdrawal no"
     if (!activePlan) {
@@ -414,11 +429,11 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
               <span className="font-mono text-slate-200">{completedWithdrawal.accountNumber}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Admin Approval:</span>
+              <span className="text-slate-400">Verification Status:</span>
               <span className={`font-bold ${completedWithdrawal.status === 'completed' ? 'text-emerald-400' : 'text-amber-400'}`}>
                 {completedWithdrawal.status === 'completed'
-                  ? `Approved by ${completedWithdrawal.approvedBy || 'Admin'}`
-                  : 'Pending Admin Verification (منظوری درکار ہے)'}
+                  ? `Approved & Paid (منظور شدہ)`
+                  : 'Pending Verification (تصدیق جاری ہے)'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -494,23 +509,13 @@ export const WithdrawView: React.FC<WithdrawViewProps> = ({
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-                      ایڈمن منظوری کی پالیسی
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      درخواست تصدیق و وصولی کا عمل
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      یہ درخواست ایڈمن (حمزہ ملک / 2nd ایڈمن) کو موصول ہو چکی ہے۔ ایڈمن پورٹل میں جا کر اس کی منظوری دی جا سکتی ہے۔
+                      آپ کی ودڈرا کی درخواست موصول ہو چکی ہے اور ٹیم کی تصدیق کے بعد رقم براہِ راست آپ کے اکاؤنٹ میں منتقل کر دی جائے گی۔
                     </p>
                   </div>
-                  {onGoToAdmin && (
-                    <button
-                      type="button"
-                      onClick={onGoToAdmin}
-                      className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shrink-0 transition-all flex items-center gap-1.5 shadow-sm"
-                    >
-                      <Lock className="w-3.5 h-3.5" />
-                      ایڈمن پورٹل لاگ ان
-                    </button>
-                  )}
                 </div>
               )}
             </div>

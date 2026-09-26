@@ -59,8 +59,10 @@ export interface WithdrawalRecord {
   amount: number;
   fee: number;
   netAmount: number;
-  accountTitle: string;
-  accountNumber: string;
+  accountTitle: string; // Account title (e.g. JazzCash/Easypaisa account holder name)
+  accountNumber: string; // Account mobile number to send withdrawal payment to
+  userName?: string; // Registered user name
+  userPhone?: string; // Registered user phone number
   date: string;
   timestamp?: number;
   status: 'completed' | 'processing' | 'pending' | 'rejected';

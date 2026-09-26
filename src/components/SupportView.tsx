@@ -21,10 +21,10 @@ import {
 } from 'lucide-react';
 
 interface SupportViewProps {
-  onOpenSocialLinksModal: () => void;
+  onOpenSocialLinksModal?: () => void;
 }
 
-export const SupportView: React.FC<SupportViewProps> = ({ onOpenSocialLinksModal }) => {
+export const SupportView: React.FC<SupportViewProps> = () => {
   const {
     user,
     whatsappLink,
@@ -97,14 +97,16 @@ export const SupportView: React.FC<SupportViewProps> = ({ onOpenSocialLinksModal
             </p>
           </div>
 
-          <button
-            onClick={onOpenSocialLinksModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs border border-emerald-500/40 transition-all shrink-0 self-start sm:self-center"
-            title="Edit WhatsApp Channel & Helplines"
+          <a
+            href={whatsappChannelLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition-all shrink-0 self-start sm:self-center active:scale-95"
+            title="Join Official WhatsApp Channel"
           >
-            <Settings className="w-4 h-4 text-emerald-400" />
-            Paste WhatsApp Links (لنکس بدلیں)
-          </button>
+            <Radio className="w-4 h-4 text-slate-950 animate-pulse" />
+            <span>Join WhatsApp Channel</span>
+          </a>
         </div>
       </div>
 
@@ -156,7 +158,7 @@ export const SupportView: React.FC<SupportViewProps> = ({ onOpenSocialLinksModal
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
                   <div>
                     <span className="text-[11px] text-slate-400 block">Primary Helpline 1 (پہلا نمبر):</span>
-                    <span className="font-mono text-emerald-400 font-extrabold text-sm">0322-5290908</span>
+                    <span className="font-mono text-emerald-400 font-extrabold text-sm">0370-6486965</span>
                   </div>
                 </div>
                 <a
@@ -210,7 +212,7 @@ export const SupportView: React.FC<SupportViewProps> = ({ onOpenSocialLinksModal
               className="py-3 px-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 active:scale-95"
             >
               <MessageCircle className="w-3.5 h-3.5 text-slate-950" />
-              WA 1 (0324)
+              WA 1 (0370)
             </a>
             <a
               id="btn-support-chat-whatsapp-2"

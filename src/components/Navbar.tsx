@@ -28,7 +28,7 @@ interface NavbarProps {
   openDepositModal: () => void;
   openWithdrawModal: () => void;
   openHowItWorks: () => void;
-  openSocialLinksModal: () => void;
+  openSocialLinksModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -189,7 +189,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Quick Action: Deposit */}
             <button
               id="nav-deposit-btn"
-              onClick={openDepositModal}
+              onClick={isLoggedIn ? openDepositModal : () => openAuthModal('signup')}
               className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 transition-all active:scale-95"
             >
               <ArrowDownCircle className="w-4 h-4" />
@@ -199,7 +199,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Quick Action: Withdraw */}
             <button
               id="nav-withdraw-btn"
-              onClick={openWithdrawModal}
+              onClick={isLoggedIn ? openWithdrawModal : () => openAuthModal('signup')}
               className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-all active:scale-95"
             >
               <ArrowUpCircle className="w-4 h-4" />
@@ -260,8 +260,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               <HelpCircle className="w-4 h-4 text-slate-300" />
             </button>
 
-            {/* Admin Portal Button - Protected & Discreet */}
-            {isAdminLoggedIn ? (
+            {/* Admin Portal Button - Only visible when admin is authenticated */}
+            {isAdminLoggedIn && (
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setActiveTab('admin')}
@@ -270,7 +270,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-500/20'
                       : 'bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border-indigo-500/40'
                   }`}
-                  title="2-Admin Management Dashboard"
+                  title="Admin Dashboard"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="hidden sm:inline font-black">{activeAdmin.name.split(' ')[0]} (Admin)</span>
@@ -298,28 +298,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
               </div>
-            ) : (
-              <button
-                onClick={() => setActiveTab('admin')}
-                className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  pendingWithdrawalsCount > 0
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm animate-pulse'
-                    : 'text-slate-400 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800'
-                }`}
-                title={
-                  pendingWithdrawalsCount > 0
-                    ? `Admin: ${pendingWithdrawalsCount} pending withdrawal request(s) awaiting approval!`
-                    : 'Admin Security Portal'
-                }
-              >
-                <Lock className={`w-3.5 h-3.5 ${pendingWithdrawalsCount > 0 ? 'text-amber-400' : 'text-slate-400'}`} />
-                <span className="hidden sm:inline text-[11px]">Admin</span>
-                {pendingWithdrawalsCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-slate-950">
-                    {pendingWithdrawalsCount} WD
-                  </span>
-                )}
-              </button>
             )}
           </div>
         </div>

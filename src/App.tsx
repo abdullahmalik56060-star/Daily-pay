@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
@@ -11,33 +11,21 @@ import { BonusView } from './components/BonusView';
 import { SupportView } from './components/SupportView';
 import { AdminPortalView } from './components/AdminPortalView';
 import { HowItWorksModal } from './components/HowItWorksModal';
-import { SocialLinksModal } from './components/SocialLinksModal';
 import { AuthModal } from './components/AuthModal';
 import { FinanceLedgerModal } from './components/FinanceLedgerModal';
 import {
   ShieldCheck,
-  RotateCcw,
-  Sparkles,
-  HelpCircle,
-  AlertCircle,
-  X,
-  CreditCard,
   MessageCircle,
   Youtube,
-  Settings,
   Radio,
 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState<boolean>(false);
-  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState<boolean>(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState<boolean>(false);
-  const [isSocialLinksModalOpen, setIsSocialLinksModalOpen] = useState<boolean>(false);
 
   const {
     toastMessage,
-    resetAllData,
     whatsappLink,
     whatsappLink2,
     whatsappChannelLink,
@@ -46,11 +34,27 @@ const AppContent: React.FC = () => {
     closeAuthModal,
     authModalMode,
     referralCodeParam,
-    openAuthModal,
-    isLoggedIn,
-    user,
-    logoutUser,
+    isAdminLoggedIn,
   } = useApp();
+
+  // Admin access via URL param (?admin=portal, ?admin=true) or hash (#admin)
+  useEffect(() => {
+    const handleAdminRoute = () => {
+      const search = window.location.search;
+      const hash = window.location.hash;
+      if (
+        hash === '#admin' ||
+        search.includes('admin=true') ||
+        search.includes('admin=portal')
+      ) {
+        setActiveTab('admin');
+      }
+    };
+
+    handleAdminRoute();
+    window.addEventListener('hashchange', handleAdminRoute);
+    return () => window.removeEventListener('hashchange', handleAdminRoute);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950">
@@ -61,7 +65,6 @@ const AppContent: React.FC = () => {
         openDepositModal={() => setActiveTab('deposit')}
         openWithdrawModal={() => setActiveTab('withdraw')}
         openHowItWorks={() => setIsHowItWorksOpen(true)}
-        openSocialLinksModal={() => setIsSocialLinksModalOpen(true)}
       />
 
       {/* Main App Canvas */}
@@ -103,7 +106,7 @@ const AppContent: React.FC = () => {
         {activeTab === 'bonus' && <BonusView />}
 
         {activeTab === 'support' && (
-          <SupportView onOpenSocialLinksModal={() => setIsSocialLinksModalOpen(true)} />
+          <SupportView />
         )}
 
         {activeTab === 'admin' && <AdminPortalView />}
@@ -122,11 +125,6 @@ const AppContent: React.FC = () => {
       {/* How It Works Guide Modal */}
       {isHowItWorksOpen && (
         <HowItWorksModal onClose={() => setIsHowItWorksOpen(false)} />
-      )}
-
-      {/* Social & Support Links Management Modal */}
-      {isSocialLinksModalOpen && (
-        <SocialLinksModal onClose={() => setIsSocialLinksModalOpen(false)} />
       )}
 
       {/* User Login & Sign Up Authentication Modal */}
@@ -160,21 +158,25 @@ const AppContent: React.FC = () => {
               Support Team
             </button>
             <span>•</span>
-            <button
-              onClick={() => setActiveTab('admin')}
-              className="text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 font-bold"
-              title="2-Admin Management Dashboard & Payout Liquidity Vault"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Admin Portal (2 Admins)
-            </button>
-            <span>•</span>
+            {isAdminLoggedIn && (
+              <>
+                <button
+                  onClick={() => setActiveTab('admin')}
+                  className="text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 font-bold"
+                  title="Admin Dashboard"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Admin Portal
+                </button>
+                <span>•</span>
+              </>
+            )}
             <a
               href={whatsappChannelLink}
               target="_blank"
               rel="noopener noreferrer"
               className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20"
-              title="Official WhatsApp Channel (واٹس ایپ چینل)"
+              title="Official WhatsApp Channel"
             >
               <Radio className="w-3.5 h-3.5 animate-pulse" />
               WhatsApp Channel
@@ -185,10 +187,10 @@ const AppContent: React.FC = () => {
               target="_blank"
               rel="noopener noreferrer"
               className="text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1"
-              title="WhatsApp Helpline 1: 0322-5290908"
+              title="WhatsApp Helpline 1: 03706486965"
             >
               <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
-              WhatsApp 1 (03225290908)
+              WhatsApp 1
             </a>
             <span>•</span>
             <a
@@ -199,7 +201,7 @@ const AppContent: React.FC = () => {
               title="WhatsApp Helpline 2: 0309-8899212"
             >
               <MessageCircle className="w-3.5 h-3.5 text-teal-400" />
-              WhatsApp 2 (03098899212)
+              WhatsApp 2
             </a>
             <span>•</span>
             <a
@@ -213,29 +215,23 @@ const AppContent: React.FC = () => {
             </a>
             <span>•</span>
             <button
-              onClick={() => setIsSocialLinksModalOpen(true)}
-              className="text-slate-300 hover:text-white transition-colors flex items-center gap-1 font-semibold bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700"
-              title="Paste WhatsApp Channel or Support Links"
-            >
-              <Settings className="w-3.5 h-3.5 text-emerald-400" />
-              Paste WhatsApp Link
-            </button>
-            <span>•</span>
-            <button
               onClick={() => setIsHowItWorksOpen(true)}
               className="hover:text-slate-300 transition-colors"
             >
               How It Works
             </button>
             <span>•</span>
-            <button
-              onClick={resetAllData}
-              className="text-slate-400 hover:text-red-400 transition-colors flex items-center gap-1"
-              title="Reset state to initial sample demo"
+            <a
+              href="#admin"
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab('admin');
+              }}
+              className="text-slate-600 hover:text-slate-400 transition-colors text-[11px]"
+              title="Portal Management"
             >
-              <RotateCcw className="w-3 h-3" />
-              Reset Demo
-            </button>
+              Portal
+            </a>
           </div>
         </div>
       </footer>

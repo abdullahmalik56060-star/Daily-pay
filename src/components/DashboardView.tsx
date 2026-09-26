@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { PLANS, SPONSORED_ADS } from '../data/mockData';
 import { AdCampaign } from '../types';
 import { AdWatchModal } from './AdWatchModal';
+import { HomeSeoContent } from './HomeSeoContent';
 import {
   Wallet,
   ArrowDownCircle,
@@ -60,6 +61,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     user,
     isLoggedIn,
     openAuthModal,
+    showToast,
     financialSummary,
     openFinanceLedger,
   } = useApp();
@@ -75,14 +77,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const ad1Reward = activePlan ? activePlan.ad1Reward : 25;
   const ad2Reward = activePlan ? activePlan.ad2Reward : 25;
-  const dailyTarget = activePlan ? activePlan.dailyEarnings : 50;
+  const dailyTarget = activePlan ? activePlan.dailyEarnings : 0;
 
   const todayEarned =
     (dailyAds.ad1Watched ? ad1Reward : 0) + (dailyAds.ad2Watched ? ad2Reward : 0);
   const adsCompleted = (dailyAds.ad1Watched ? 1 : 0) + (dailyAds.ad2Watched ? 1 : 0);
 
   const handleStartAd = (adNumber: 1 | 2) => {
+    if (!isLoggedIn) {
+      openAuthModal('signup');
+      return;
+    }
+
+    // User requirement: "Jb plan acctive na kr ly tb tk adds nna dak sakhy"
     if (!activePlan) {
+      showToast('ایڈز دیکھنے اور روزانہ ارننگ حاصل کرنے کے لیے پہلے کوئی پلان ایکٹو کریں! (Please activate a plan first)');
       onNavigate('plans');
       return;
     }
@@ -95,6 +104,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       campaign: selectedCampaign,
       reward,
     });
+  };
+
+  const handleDepositClick = () => {
+    if (!isLoggedIn) {
+      openAuthModal('signup');
+      return;
+    }
+    onOpenDeposit();
+  };
+
+  const handleWithdrawClick = () => {
+    if (!isLoggedIn) {
+      openAuthModal('signup');
+      return;
+    }
+    onOpenWithdraw();
   };
 
   return (
@@ -119,6 +144,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
+      {/* Non-logged in Welcome Gate Banner (Prompts Sign Up / Login first) */}
+      {!isLoggedIn && (
+        <div className="rounded-2xl p-6 bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 border-2 border-emerald-500/50 shadow-2xl space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1.5 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-black">
+                <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
+                <span>خوش آمدید! سائن اپ پر مفت 25 روپے ویلکم بونس</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white">
+                Daily Pay Ads Earning - آن لائن ایڈز دیکھ کر روزانہ کمائیں
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                ارننگ شروع کرنے کے لیے پہلے سائن اپ یا لاگ ان کریں۔ نیا اکاؤنٹ بناتے ہی 25 روپے ویلکم بونس آپ کے اکاؤنٹ میں جمع ہو جائے گا اور آپ روزانہ 2 ایڈز دیکھ کر کما سکیں گے۔
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => openAuthModal('signup')}
+                className="px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/30 transition-all flex items-center gap-2 active:scale-95"
+              >
+                <UserPlus className="w-5 h-5" />
+                <span>نیا اکاؤنٹ بنائیں (Sign Up)</span>
+                <span className="bg-slate-950/20 px-2 py-0.5 rounded text-xs font-black">
+                  +Rs 25 Free
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => openAuthModal('login')}
+                className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm border border-slate-700 transition-all flex items-center gap-2 active:scale-95"
+              >
+                <LogIn className="w-4 h-4 text-emerald-400" />
+                <span>لاگ ان کریں (Login)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Welcome & Balance Hero Card */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Main Wallet & Quick Actions Card */}
@@ -132,7 +199,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </span>
                 <span className="text-slate-600 hidden sm:inline">•</span>
                 <span className="text-xs text-slate-300 font-semibold hidden sm:inline">
-                  {user.firstName || user.name}
+                  {isLoggedIn ? (user.firstName || user.name) : 'Guest (Not Logged In)'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -174,7 +241,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <span className="text-xs font-bold text-amber-300">Daily Bonus Ready (+Rs 5 PKR)</span>
                 </div>
                 <button
-                  onClick={claimDailyCheckIn}
+                  onClick={isLoggedIn ? claimDailyCheckIn : () => openAuthModal('signup')}
                   className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition-all shadow-sm active:scale-95"
                 >
                   Claim Free Rs 5
@@ -188,7 +255,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="flex items-center gap-2 text-amber-300">
                   <Lock className="w-4 h-4 text-amber-400 shrink-0" />
                   <span>
-                    <strong>Demo Mode:</strong> Login bonus Rs 25 active. جب تک پلان منتخب نہ کریں ودڈرا نہیں ہوگا (Withdrawal locked until a plan is chosen).
+                    <strong>Starter Access:</strong> 2 daily ads ready to view. To withdraw earnings, choose an official 60-day plan (150, 300, 450 PKR).
                   </span>
                 </div>
                 <button
@@ -204,7 +271,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Quick Action Buttons */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-6 mt-4 border-t border-slate-800">
             <button
-              onClick={onOpenDeposit}
+              onClick={handleDepositClick}
               className="py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 active:scale-95"
             >
               <ArrowDownCircle className="w-4 h-4" />
@@ -212,7 +279,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
 
             <button
-              onClick={onOpenWithdraw}
+              onClick={handleWithdrawClick}
               className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs border border-slate-700 transition-all flex items-center justify-center gap-2 active:scale-95"
             >
               <ArrowUpCircle className="w-4 h-4" />
@@ -308,7 +375,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 ? `Earn Rs ${dailyAds.ad1Watched ? 0 : ad1Reward} from Ad #1 + Rs ${
                     dailyAds.ad2Watched ? 0 : ad2Reward
                   } from Ad #2`
-                : 'Subscribe to a plan to unlock today’s 2 sponsored video ads.'}
+                : 'اشتہارات دیکھنے اور ارننگ حاصل کرنے کیلئے پہلے کوئی پلان ایکٹو کریں (Please activate a plan first to watch ads)'}
             </p>
           </div>
 
@@ -328,6 +395,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
+        {/* Plan Required Gate Banner if Logged In but No Active Plan */}
+        {isLoggedIn && !activePlan && (
+          <div className="p-4 rounded-xl bg-gradient-to-r from-amber-950/60 via-slate-950 to-amber-950/40 border border-amber-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-amber-200">
+              <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>پلان ایکٹو کرنا لازمی ہے:</strong> جب تک آپ پلان ایکٹو نہیں کریں گے تب تک ایڈز نہیں دیکھ سکتے!
+              </span>
+            </div>
+            <button
+              onClick={() => onNavigate('plans')}
+              className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 shrink-0"
+            >
+              ابھی پلان منتخب کریں
+            </button>
+          </div>
+        )}
+
         {/* 2 Ad Cards Side-by-Side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Ad 1 Box */}
@@ -342,7 +427,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Reward: <strong className="text-emerald-400">Rs {ad1Reward} PKR</strong> (10s view)
+                Reward:{' '}
+                <strong className="text-emerald-400">
+                  {activePlan ? `Rs ${ad1Reward} PKR` : 'Rs 25 - Rs 75 PKR'}
+                </strong>{' '}
+                {activePlan ? '(10s view)' : '(پلان ایکٹو کرنے پر)'}
               </p>
             </div>
 
@@ -351,21 +440,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <CheckCircle2 className="w-4 h-4" />
                 Completed
               </span>
+            ) : !isLoggedIn ? (
+              <button
+                onClick={() => openAuthModal('signup')}
+                className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                Sign Up to Watch
+              </button>
             ) : !activePlan ? (
               <button
                 onClick={() => onNavigate('plans')}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-1"
+                className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
               >
                 <Lock className="w-3.5 h-3.5" />
-                Locked
+                پلان ایکٹو کریں
               </button>
             ) : (
               <button
+                id="btn-dash-watch-ad-1"
                 onClick={() => handleStartAd(1)}
                 className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
               >
                 <PlayCircle className="w-4 h-4" />
-                Watch Ad #1
+                Watch Ad #1 (Earn Rs {ad1Reward})
               </button>
             )}
           </div>
@@ -382,7 +480,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Reward: <strong className="text-emerald-400">Rs {ad2Reward} PKR</strong> (10s view)
+                Reward:{' '}
+                <strong className="text-emerald-400">
+                  {activePlan ? `Rs ${ad2Reward} PKR` : 'Rs 25 - Rs 75 PKR'}
+                </strong>{' '}
+                {activePlan ? '(10s view)' : '(پلان ایکٹو کرنے پر)'}
               </p>
             </div>
 
@@ -391,21 +493,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <CheckCircle2 className="w-4 h-4" />
                 Completed
               </span>
+            ) : !isLoggedIn ? (
+              <button
+                onClick={() => openAuthModal('signup')}
+                className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold flex items-center gap-1 shadow-sm active:scale-95 transition-all"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                Sign Up to Watch
+              </button>
             ) : !activePlan ? (
               <button
                 onClick={() => onNavigate('plans')}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs font-semibold flex items-center gap-1"
+                className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
               >
                 <Lock className="w-3.5 h-3.5" />
-                Locked
+                پلان ایکٹو کریں
               </button>
             ) : (
               <button
+                id="btn-dash-watch-ad-2"
                 onClick={() => handleStartAd(2)}
                 className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
               >
                 <PlayCircle className="w-4 h-4" />
-                Watch Ad #2
+                Watch Ad #2 (Earn Rs {ad2Reward})
               </button>
             )}
           </div>
@@ -448,10 +559,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-xs transition-all flex items-center gap-1.5"
-              title="Instant WhatsApp Helpline 1: 03225290908"
+              title="Instant WhatsApp Helpline 1: 03706486965"
             >
               <MessageCircle className="w-3.5 h-3.5" />
-              WhatsApp 1 (03225290908)
+              WhatsApp 1 (03706486965)
             </a>
             <a
               href={whatsappLink2}
@@ -673,6 +784,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           ))}
         </div>
       </div>
+
+      {/* SEO & Platform Content Section: Daily Pay Ads Earning */}
+      <HomeSeoContent
+        onNavigate={onNavigate}
+        onOpenDeposit={onOpenDeposit}
+        onOpenWithdraw={onOpenWithdraw}
+      />
 
       {/* Ad Watch Modal */}
       {activeAdCampaign && (

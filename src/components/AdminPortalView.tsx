@@ -40,6 +40,7 @@ import {
   Smartphone,
   RotateCcw,
   X,
+  Copy,
   Link2,
   Youtube,
 } from 'lucide-react';
@@ -440,21 +441,54 @@ export const AdminPortalView: React.FC = () => {
             {pendingWithdrawals.map((pw) => {
               const hasEnoughReserve = appReserveBalance >= pw.netAmount;
               return (
-                <div key={pw.id} className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 flex flex-col justify-between gap-3 shadow-lg">
+                <div key={pw.id} className="p-4 sm:p-5 rounded-2xl bg-slate-950/95 border border-amber-500/40 flex flex-col justify-between gap-3 shadow-xl">
                   <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-slate-400">{pw.referenceId}</span>
-                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black bg-slate-800 text-emerald-400 uppercase border border-slate-700">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        <span className="text-xs font-mono font-bold text-slate-300">{pw.referenceId}</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black bg-emerald-500/15 text-emerald-400 uppercase border border-emerald-500/30">
                         {pw.method}
                       </span>
                     </div>
-                    <div className="mt-2 flex items-baseline justify-between">
-                      <div>
-                        <p className="text-sm font-bold text-white">{pw.accountTitle}</p>
-                        <p className="text-xs text-slate-400 font-mono">{pw.accountNumber}</p>
+
+                    {/* Prominent User Name & Mobile Number Payout Box */}
+                    <div className="mt-3 p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-slate-400">صارف کا نام (Account Title):</span>
+                        <span className="text-sm font-black text-white">{pw.accountTitle}</span>
                       </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                        <span className="text-[11px] text-slate-400">نمبر (JazzCash/Easypaisa):</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-mono font-extrabold text-emerald-400">{pw.accountNumber}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(pw.accountNumber);
+                              showToast(`نمبر ${pw.accountNumber} کاپی کر لیا گیا!`);
+                            }}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[10px] font-bold border border-slate-700 flex items-center gap-1 transition-all active:scale-95"
+                            title="Copy Mobile Number"
+                          >
+                            <Copy className="w-3 h-3 text-emerald-400" />
+                            <span>کاپی</span>
+                          </button>
+                        </div>
+                      </div>
+                      {pw.userName && pw.userName !== pw.accountTitle && (
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+                          <span>رجسٹرڈ صارف نام:</span>
+                          <span className="font-semibold text-slate-300">{pw.userName}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-xs text-slate-400">ادائیگی کی رقم (Amount):</span>
                       <div className="text-right">
-                        <span className="text-lg font-black text-emerald-400">Rs {pw.netAmount.toLocaleString()}</span>
+                        <span className="text-lg font-black text-emerald-400">Rs {pw.netAmount.toLocaleString()} PKR</span>
                         <span className="block text-[10px] text-slate-400">{pw.date}</span>
                       </div>
                     </div>
@@ -1178,9 +1212,9 @@ export const AdminPortalView: React.FC = () => {
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 font-semibold">
                     <th className="px-4 py-3">Ref ID</th>
-                    <th className="px-4 py-3">صارف اور اکاؤنٹ</th>
-                    <th className="px-4 py-3">طریقہ کار</th>
-                    <th className="px-4 py-3">رقم</th>
+                    <th className="px-4 py-3">صارف کا نام اور نمبر (User Name & Mobile)</th>
+                    <th className="px-4 py-3">طریقہ کار (Method)</th>
+                    <th className="px-4 py-3">ادائیگی کی رقم (Amount)</th>
                     <th className="px-4 py-3">حیثیت (Status)</th>
                     <th className="px-4 py-3 text-right">ایڈمن ایکشن (Admin Action)</th>
                   </tr>
@@ -1202,8 +1236,31 @@ export const AdminPortalView: React.FC = () => {
                         <tr key={w.id} className="hover:bg-slate-800/30 transition-colors">
                           <td className="px-4 py-3.5 font-mono text-slate-300 font-bold">{w.referenceId}</td>
                           <td className="px-4 py-3.5">
-                            <p className="font-bold text-white">{w.accountTitle}</p>
-                            <p className="text-[11px] text-slate-400 font-mono">{w.accountNumber}</p>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-extrabold text-white text-sm">{w.accountTitle}</span>
+                                {w.userName && w.userName !== w.accountTitle && (
+                                  <span className="text-[10px] text-slate-400">({w.userName})</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-emerald-400 font-mono font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                                  {w.accountNumber}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(w.accountNumber);
+                                    showToast(`نمبر ${w.accountNumber} کاپی کر لیا گیا!`);
+                                  }}
+                                  className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[10px] font-bold border border-slate-700 flex items-center gap-1 transition-all active:scale-95"
+                                  title="Copy Mobile Number"
+                                >
+                                  <Copy className="w-2.5 h-2.5 text-emerald-400" />
+                                  <span>کاپی</span>
+                                </button>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-4 py-3.5">
                             <span className="uppercase font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">

@@ -27,6 +27,7 @@ export const BonusView: React.FC = () => {
     referralFriends,
     whatsappLink,
     openAuthModal,
+    isLoggedIn,
   } = useApp();
 
   const [copied, setCopied] = useState(false);
@@ -181,7 +182,7 @@ export const BonusView: React.FC = () => {
               </div>
             ) : (
               <button
-                onClick={claimDailyCheckIn}
+                onClick={isLoggedIn ? claimDailyCheckIn : () => openAuthModal('signup')}
                 className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5" />

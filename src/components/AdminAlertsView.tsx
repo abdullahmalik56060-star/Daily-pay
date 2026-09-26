@@ -22,6 +22,7 @@ import {
   Radio,
   X,
   Zap,
+  Copy,
 } from 'lucide-react';
 
 export const AdminAlertsView: React.FC = () => {
@@ -310,31 +311,84 @@ export const AdminAlertsView: React.FC = () => {
 
                       <p className="text-xs text-slate-300 leading-relaxed">{alert.details}</p>
 
-                      {/* User & Financial Details Strip */}
-                      <div className="flex items-center gap-3 flex-wrap pt-1 text-xs text-slate-400">
-                        {alert.userName && (
-                          <span className="flex items-center gap-1 text-slate-300 font-semibold">
-                            <User className="w-3.5 h-3.5 text-slate-500" />
-                            {alert.userName}
-                          </span>
-                        )}
-                        {alert.userPhone && (
-                          <span className="flex items-center gap-1 font-mono text-slate-400">
-                            <Phone className="w-3.5 h-3.5 text-slate-500" />
-                            {alert.userPhone}
-                          </span>
-                        )}
-                        {alert.paymentMethod && (
-                          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px] font-medium">
-                            {alert.paymentMethod}
-                          </span>
-                        )}
-                        {alert.amount !== undefined && (
-                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-black text-xs">
-                            Rs {alert.amount.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
+                      {/* Prominent Withdrawal Payout Info Box for Admin */}
+                      {isWithdrawal && (
+                        <div className="mt-2.5 p-3 rounded-xl bg-slate-950/90 border border-amber-500/30 space-y-2">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-amber-400">
+                            <span className="flex items-center gap-1">
+                              <ArrowUpCircle className="w-3.5 h-3.5" />
+                              ادائیگی کی معلومات (Payout Details)
+                            </span>
+                            {alert.method && (
+                              <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-extrabold uppercase border border-emerald-500/30">
+                                {alert.method}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                              <span className="text-[10px] text-slate-400 block">صارف کا نام (Account Title):</span>
+                              <strong className="text-white text-sm">{alert.userName || 'User'}</strong>
+                            </div>
+                            <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+                              <div>
+                                <span className="text-[10px] text-slate-400 block">نمبر (JazzCash/Easypaisa):</span>
+                                <strong className="text-emerald-400 font-mono text-sm">{alert.userPhone || 'N/A'}</strong>
+                              </div>
+                              {alert.userPhone && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(alert.userPhone);
+                                    showToast(`نمبر ${alert.userPhone} کاپی ہو گیا!`);
+                                  }}
+                                  className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[10px] font-bold border border-slate-700 flex items-center gap-1 transition-all active:scale-95"
+                                  title="Copy Number"
+                                >
+                                  <Copy className="w-2.5 h-2.5 text-emerald-400" />
+                                  <span>کاپی</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {alert.amount !== undefined && (
+                            <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/80">
+                              <span className="text-slate-400">بھیجنے والی رقم (Net Amount):</span>
+                              <span className="text-emerald-400 font-black text-sm">Rs {alert.amount.toLocaleString()} PKR</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* General User & Financial Details Strip for Non-Withdrawals */}
+                      {!isWithdrawal && (
+                        <div className="flex items-center gap-3 flex-wrap pt-1 text-xs text-slate-400">
+                          {alert.userName && (
+                            <span className="flex items-center gap-1 text-slate-300 font-semibold">
+                              <User className="w-3.5 h-3.5 text-slate-500" />
+                              {alert.userName}
+                            </span>
+                          )}
+                          {alert.userPhone && (
+                            <span className="flex items-center gap-1 font-mono text-slate-400">
+                              <Phone className="w-3.5 h-3.5 text-slate-500" />
+                              {alert.userPhone}
+                            </span>
+                          )}
+                          {(alert.method || alert.paymentMethod) && (
+                            <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px] font-medium">
+                              {alert.method || alert.paymentMethod}
+                            </span>
+                          )}
+                          {alert.amount !== undefined && (
+                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-black text-xs">
+                              Rs {alert.amount.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 

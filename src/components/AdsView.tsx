@@ -3,7 +3,6 @@ import { useApp } from '../context/AppContext';
 import { PLANS } from '../data/mockData';
 import { AdCampaign } from '../types';
 import { AdWatchModal } from './AdWatchModal';
-import { AdPlacementManagerModal } from './AdPlacementManagerModal';
 import {
   PlayCircle,
   CheckCircle2,
@@ -12,16 +11,11 @@ import {
   Sparkles,
   Zap,
   RotateCcw,
-  Calendar,
   AlertTriangle,
   TrendingUp,
-  DollarSign,
-  Settings,
-  Edit3,
-  Tv,
-  Layers,
   Youtube,
-  Image as ImageIcon,
+  ShieldCheck,
+  UserPlus,
 } from 'lucide-react';
 
 interface AdsViewProps {
@@ -29,7 +23,15 @@ interface AdsViewProps {
 }
 
 export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
-  const { activePlan, dailyAds, simulateNextDay, getCampaignForSlot } = useApp();
+  const {
+    activePlan,
+    dailyAds,
+    simulateNextDay,
+    getCampaignForSlot,
+    isLoggedIn,
+    openAuthModal,
+    showToast,
+  } = useApp();
 
   const [activeAdCampaign, setActiveAdCampaign] = useState<{
     adNumber: 1 | 2;
@@ -37,16 +39,13 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
     reward: number;
   } | null>(null);
 
-  const [isAdManagerOpen, setIsAdManagerOpen] = useState<boolean>(false);
-  const [managerSlot, setManagerSlot] = useState<1 | 2>(1);
-
   const slot1Campaign = getCampaignForSlot(1);
   const slot2Campaign = getCampaignForSlot(2);
 
-  // Rewards based on active plan
+  // Rewards based on active plan (or 0 / plan estimate if no paid plan)
   const ad1Reward = activePlan ? activePlan.ad1Reward : 25;
   const ad2Reward = activePlan ? activePlan.ad2Reward : 25;
-  const dailyTarget = activePlan ? activePlan.dailyEarnings : 50;
+  const dailyTarget = activePlan ? activePlan.dailyEarnings : 0;
 
   const todayEarned =
     (dailyAds.ad1Watched ? ad1Reward : 0) + (dailyAds.ad2Watched ? ad2Reward : 0);
@@ -54,7 +53,14 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
   const completedCount = (dailyAds.ad1Watched ? 1 : 0) + (dailyAds.ad2Watched ? 1 : 0);
 
   const handleStartAd = (adNumber: 1 | 2) => {
+    if (!isLoggedIn) {
+      openAuthModal('signup');
+      return;
+    }
+
+    // User requirement: "Jb plan acctive na kr ly tb tk adds nna dak sakhy"
     if (!activePlan) {
+      showToast('ایڈز دیکھنے اور روزانہ ارننگ حاصل کرنے کے لیے پہلے کوئی پلان ایکٹو کریں! (Please activate a plan first)');
       onGoToPlans();
       return;
     }
@@ -69,11 +75,6 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
     });
   };
 
-  const handleOpenManagerForSlot = (slot: 1 | 2) => {
-    setManagerSlot(slot);
-    setIsAdManagerOpen(true);
-  };
-
   return (
     <div className="space-y-8">
       {/* Top Banner */}
@@ -84,11 +85,10 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
             Check Daily Ads Earnings (Strictly 2 Ads Per Day)
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Daily Sponsored Ads Task
+            Daily Sponsored Ads Task (روزانہ ایڈز ٹاسک)
           </h2>
           <p className="text-sm text-slate-300 leading-relaxed">
-            Watch today's 2 short ads (10 seconds each) to credit your wallet instantly. Earnings are determined by your
-            active 2-month plan.
+            Watch today's 2 sponsored video ads (10 seconds each) to credit your wallet instantly. Complete both tasks daily to claim your earnings.
           </p>
         </div>
 
@@ -97,7 +97,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
           <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-left sm:text-right">
             <span className="text-xs text-slate-400">Today's Ads Revenue</span>
             <p className="text-xl font-black text-emerald-400">
-              Rs {todayEarned} <span className="text-xs text-slate-400">/ Rs {activePlan ? dailyTarget : 0}</span>
+              Rs {todayEarned} <span className="text-xs text-slate-400">/ Rs {dailyTarget}</span>
             </p>
             <p className="text-[11px] text-slate-400 mt-1">
               Progress: <strong>{completedCount} of 2 Ads</strong>
@@ -107,6 +107,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
           <button
             onClick={simulateNextDay}
             className="text-xs text-teal-400 hover:text-teal-300 flex items-center gap-1 font-semibold px-3 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 transition-all"
+            title="Fast-forward to test tomorrow's reset"
           >
             <RotateCcw className="w-3 h-3" />
             Simulate Next Day (Test 2 New Ads)
@@ -114,23 +115,23 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
         </div>
       </div>
 
-      {/* Ad Placement Architecture Card (YouTube Ads System) */}
+      {/* Verified YouTube Ads Architecture Banner (Clean Read-Only for Users) */}
       <div className="rounded-2xl p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-slate-950 to-red-950/30 border border-red-500/30 shadow-lg relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-bold">
               <Youtube className="w-3.5 h-3.5" />
-              YouTube Ads Link System (یوٹیوب ایڈز کا لنک لگانے کی جگہ)
+              Verified Daily YouTube Ads (100% تصدیق شدہ ایڈز)
             </div>
             <h3 className="text-lg font-black text-white">
-              Daily 2 YouTube Ads Management (یوٹیوب ویڈیو لنکس سیٹ کریں)
+              Daily 2 Sponsored Ads (صرف 10 سیکنڈز ویڈیو دیکھیں اور کمائیں)
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed">
-              صارفین کے لیے روزانہ کے 2 یوٹیوب ایڈز کا لنک یہاں لگائیں۔ آپ یوٹیوب ویڈیو کا لنک (URL) پیسٹ کریں اور محفوظ کریں، صارف 10 سیکنڈ تک ویڈیو دیکھ کر سوال کا جواب دے گا اور ارننگ حاصل کرے گا۔
+              ہر ایڈ کو 10 سیکنڈ تک دیکھیں، ویڈیو مکمل ہونے پر ایک آسان سوال کا جواب دیں اور رقم فوری طور پر اپنے اکاؤنٹ میں حاصل کریں۔
             </p>
 
             <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
-              <span className="text-slate-400">Current YouTube Ads:</span>
+              <span className="text-slate-400">Today's Sponsored Ads:</span>
               <span className="px-2 py-0.5 rounded bg-red-500/15 border border-red-500/30 text-red-300 font-semibold truncate max-w-xs flex items-center gap-1">
                 <Youtube className="w-3 h-3 text-red-500" />
                 Slot 1: {slot1Campaign.title}
@@ -142,39 +143,73 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              id="btn-open-ad-manager"
-              type="button"
-              onClick={() => handleOpenManagerForSlot(1)}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-xs shadow-lg shadow-red-600/20 transition-all flex items-center gap-2 active:scale-95"
-            >
-              <Youtube className="w-4 h-4 text-white" />
-              Paste YouTube Ad Links (یوٹیوب ایڈ لگائیں)
-            </button>
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="px-4 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-center">
+              <span className="text-slate-400 block text-[10px]">Today's Status</span>
+              <span className={`font-black text-xs ${completedCount === 2 ? 'text-emerald-400' : 'text-blue-400'}`}>
+                {completedCount === 2 ? '✓ 2 of 2 Completed' : `${completedCount}/2 Completed`}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* No Plan Warning Banner */}
-      {!activePlan && (
-        <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <h4 className="text-sm font-bold text-amber-300">No Active Earning Plan Detected</h4>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Subscribe to Plan 1 (Rs 150 = Rs 50/day), Plan 2 (Rs 300 = Rs 100/day), or Plan 3 (Rs 450 = Rs 150/day)
-                to unlock and earn from daily ads for 2 months.
-              </p>
+      {/* Guest Notice if Not Logged In */}
+      {!isLoggedIn && (
+        <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-950/50 via-slate-900 to-slate-900 border border-emerald-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+              <Sparkles className="w-4 h-4" />
+              Sign Up or Login to Earn
             </div>
+            <h4 className="text-sm font-bold text-white">
+              ایڈز دیکھ کر ارننگ کرنے کے لیے سائن اپ یا لاگ ان کریں!
+            </h4>
+            <p className="text-xs text-slate-300">
+              نیا اکاؤنٹ بنانے پر 25 روپے فوری ویلکم بونس ملے گا۔
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => openAuthModal('signup')}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-1.5"
+            >
+              <UserPlus className="w-4 h-4" />
+              Sign Up & Get Rs 25
+            </button>
+            <button
+              onClick={() => openAuthModal('login')}
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition-all"
+            >
+              Login
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Plan Required Gate Banner if Logged In but No Active Plan */}
+      {isLoggedIn && !activePlan && (
+        <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-amber-950/60 via-slate-900 to-amber-950/40 border border-amber-500/50 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1.5 max-w-xl">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold">
+              <Lock className="w-3.5 h-3.5" />
+              پلان ایکٹو کرنا لازمی ہے (Plan Required to Watch Ads)
+            </div>
+            <h4 className="text-base sm:text-lg font-black text-white">
+              جب تک آپ پلان ایکٹو نہیں کریں گے تب تک ایڈز نہیں دیکھ سکتے!
+            </h4>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              روزانہ کے 2 ایڈز دیکھنے اور روزانہ 50 روپے، 100 روپے یا 150 روپے کی ارننگ حاصل کرنے کیلئے نیچے دیے گئے پلانز (150 روپے، 300 روپے یا 450 روپے) میں سے کوئی ایک پلان ایکٹو کریں۔
+            </p>
           </div>
 
           <button
             onClick={onGoToPlans}
-            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition-all whitespace-nowrap shadow-md"
+            className="px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2 shrink-0 active:scale-95"
           >
-            Choose a Plan Now
+            <Zap className="w-4 h-4 fill-current" />
+            ابھی پلان منتخب اور ایکٹو کریں (Select Plan)
           </button>
         </div>
       )}
@@ -187,7 +222,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
             dailyAds.ad1Watched
               ? 'bg-slate-900/60 border-emerald-500/40'
               : !activePlan
-              ? 'bg-slate-900/40 border-slate-800'
+              ? 'bg-slate-900/80 border-amber-500/30'
               : 'bg-slate-900 border-slate-700 hover:border-emerald-500/60 shadow-lg'
           }`}
         >
@@ -200,6 +235,11 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
               <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Completed
+              </span>
+            ) : !activePlan ? (
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                <Lock className="w-3.5 h-3.5" />
+                Locked (پلان درکار ہے)
               </span>
             ) : (
               <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -215,34 +255,36 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
               Watch this 10-second sponsor showcase and answer a quick human verification question to claim your reward.
             </p>
 
-            {/* Placed Ad Sponsor Info Badge */}
+            {/* Placed Ad Sponsor Info Badge (Read-Only) */}
             <div className="p-3 rounded-xl bg-slate-950/80 border border-red-500/20 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-red-400 flex items-center gap-1">
                   <Youtube className="w-3 h-3 text-red-500" />
-                  YouTube Ad Link in Slot #1
+                  Official Sponsored Video
                 </span>
-                <button
-                  type="button"
-                  onClick={() => handleOpenManagerForSlot(1)}
-                  className="text-[11px] text-red-400 hover:text-red-300 font-bold flex items-center gap-1 hover:underline"
-                >
-                  <Edit3 className="w-3 h-3" />
-                  Paste / Change YouTube Ad
-                </button>
+                <span className="text-[10px] font-semibold text-slate-400">
+                  10s Duration
+                </span>
               </div>
               <p className="text-xs font-extrabold text-white truncate">
                 {slot1Campaign.title}
               </p>
               <p className="text-[11px] text-slate-400 line-clamp-1">
-                {slot1Campaign.videoUrl || slot1Campaign.tagline}
+                {slot1Campaign.brand} • {slot1Campaign.tagline}
               </p>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
               <div>
                 <span className="text-[11px] text-slate-400">Ad #1 Reward:</span>
-                <p className="text-xl font-black text-emerald-400">Rs {ad1Reward} PKR</p>
+                <p className="text-xl font-black text-emerald-400">
+                  {activePlan ? `Rs ${ad1Reward} PKR` : 'Rs 25 - Rs 75 PKR'}
+                </p>
+                {!activePlan && (
+                  <span className="text-[10px] text-amber-400 font-semibold block">
+                    (پلان ایکٹو کرنے پر فعال ہوگا)
+                  </span>
+                )}
               </div>
               <div className="text-right">
                 <span className="text-[11px] text-slate-400">Credit Destination:</span>
@@ -256,13 +298,21 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
               <div className="py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center text-xs font-bold text-emerald-400">
                 ✓ Rs {ad1Reward} Added to Balance Today
               </div>
+            ) : !isLoggedIn ? (
+              <button
+                onClick={() => openAuthModal('signup')}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 active:scale-95"
+              >
+                <UserPlus className="w-4 h-4" />
+                Sign Up / Login to Watch Ad #1
+              </button>
             ) : !activePlan ? (
               <button
                 onClick={onGoToPlans}
-                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 active:scale-95"
               >
-                <Lock className="w-4 h-4 text-amber-400" />
-                Activate Plan to Unlock Ad #1
+                <Lock className="w-4 h-4" />
+                پہلے پلان ایکٹو کریں (Activate Plan to Watch)
               </button>
             ) : (
               <button
@@ -283,7 +333,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
             dailyAds.ad2Watched
               ? 'bg-slate-900/60 border-emerald-500/40'
               : !activePlan
-              ? 'bg-slate-900/40 border-slate-800'
+              ? 'bg-slate-900/80 border-amber-500/30'
               : 'bg-slate-900 border-slate-700 hover:border-emerald-500/60 shadow-lg'
           }`}
         >
@@ -296,6 +346,11 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
               <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Completed
+              </span>
+            ) : !activePlan ? (
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                <Lock className="w-3.5 h-3.5" />
+                Locked (پلان درکار ہے)
               </span>
             ) : (
               <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -311,38 +366,42 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
               Complete your second daily task to earn the remaining half of your guaranteed daily plan earnings.
             </p>
 
-            {/* Placed Ad Sponsor Info Badge */}
+            {/* Placed Ad Sponsor Info Badge (Read-Only) */}
             <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/20 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
                   <Youtube className="w-3 h-3 text-red-500" />
-                  YouTube Ad Link in Slot #2
+                  Official Sponsored Video
                 </span>
-                <button
-                  type="button"
-                  onClick={() => handleOpenManagerForSlot(2)}
-                  className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 hover:underline"
-                >
-                  <Edit3 className="w-3 h-3" />
-                  Paste / Change YouTube Ad
-                </button>
+                <span className="text-[10px] font-semibold text-slate-400">
+                  10s Duration
+                </span>
               </div>
               <p className="text-xs font-extrabold text-white truncate">
                 {slot2Campaign.title}
               </p>
               <p className="text-[11px] text-slate-400 line-clamp-1">
-                {slot2Campaign.videoUrl || slot2Campaign.tagline}
+                {slot2Campaign.brand} • {slot2Campaign.tagline}
               </p>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
               <div>
                 <span className="text-[11px] text-slate-400">Ad #2 Reward:</span>
-                <p className="text-xl font-black text-emerald-400">Rs {ad2Reward} PKR</p>
+                <p className="text-xl font-black text-emerald-400">
+                  {activePlan ? `Rs ${ad2Reward} PKR` : 'Rs 25 - Rs 75 PKR'}
+                </p>
+                {!activePlan && (
+                  <span className="text-[10px] text-amber-400 font-semibold block">
+                    (پلان ایکٹو کرنے پر فعال ہوگا)
+                  </span>
+                )}
               </div>
               <div className="text-right">
                 <span className="text-[11px] text-slate-400">Daily Total:</span>
-                <p className="text-xs font-semibold text-slate-200">Rs {dailyTarget} / Day</p>
+                <p className="text-xs font-semibold text-slate-200">
+                  {activePlan ? `Rs ${dailyTarget} / Day` : 'Rs 50 - 150 / Day'}
+                </p>
               </div>
             </div>
           </div>
@@ -352,13 +411,21 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
               <div className="py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center text-xs font-bold text-emerald-400">
                 ✓ Rs {ad2Reward} Added to Balance Today
               </div>
+            ) : !isLoggedIn ? (
+              <button
+                onClick={() => openAuthModal('signup')}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 active:scale-95"
+              >
+                <UserPlus className="w-4 h-4" />
+                Sign Up / Login to Watch Ad #2
+              </button>
             ) : !activePlan ? (
               <button
                 onClick={onGoToPlans}
-                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 active:scale-95"
               >
-                <Lock className="w-4 h-4 text-amber-400" />
-                Activate Plan to Unlock Ad #2
+                <Lock className="w-4 h-4" />
+                پہلے پلان ایکٹو کریں (Activate Plan to Watch)
               </button>
             ) : (
               <button
@@ -384,8 +451,7 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
             Daily Ad Tasks Finished! You Earned Rs {dailyTarget} Today!
           </h3>
           <p className="text-xs text-slate-300 max-w-md mx-auto">
-            Your earnings have been added to your wallet. You can withdraw anytime via JazzCash, Easypaisa, OPay, or Card.
-            Next 2 ads will be available tomorrow.
+            Your earnings have been added to your wallet. You can withdraw anytime via JazzCash, Easypaisa, OPay, or Card. Next 2 ads will be available tomorrow.
           </p>
 
           <div className="pt-2">
@@ -418,35 +484,28 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
               <tr className="border-b border-slate-800 text-slate-400 font-semibold">
                 <th className="pb-3">Subscription Plan</th>
                 <th className="pb-3">Cost</th>
-                <th className="pb-3">Daily Ads</th>
-                <th className="pb-3">Per Ad Reward</th>
+                <th className="pb-3">Ads / Day</th>
                 <th className="pb-3">Daily Earnings</th>
-                <th className="pb-3">30 Days (1 Mo)</th>
-                <th className="pb-3 text-right">60 Days (Total)</th>
+                <th className="pb-3">Monthly (30 Days)</th>
+                <th className="pb-3 text-right">Total (60 Days)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {PLANS.map((p) => {
-                const isSelected = activePlan?.planId === p.id;
+                const isCurrent = activePlan?.planId === p.id;
                 return (
-                  <tr
-                    key={p.id}
-                    className={`hover:bg-slate-800/40 transition-colors ${
-                      isSelected ? 'bg-emerald-500/10 font-medium text-emerald-300' : 'text-slate-300'
-                    }`}
-                  >
-                    <td className="py-3.5 font-bold flex items-center gap-2">
+                  <tr key={p.id} className={isCurrent ? 'bg-emerald-500/10' : ''}>
+                    <td className="py-3.5 font-bold text-white flex items-center gap-2">
                       {p.name}
-                      {isSelected && (
-                        <span className="text-[10px] bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded font-extrabold">
-                          ACTIVE
+                      {isCurrent && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-extrabold border border-emerald-500/30">
+                          Active
                         </span>
                       )}
                     </td>
-                    <td className="py-3.5 text-slate-200">Rs {p.price}</td>
-                    <td className="py-3.5">2 Ads/day</td>
-                    <td className="py-3.5 font-mono">
-                      Rs {p.ad1Reward} + Rs {p.ad2Reward}
+                    <td className="py-3.5 text-slate-300">Rs {p.price}</td>
+                    <td className="py-3.5 text-slate-300">
+                      2 Ads ({p.ad1Reward} + {p.ad2Reward} Rs)
                     </td>
                     <td className="py-3.5 font-bold text-emerald-400">Rs {p.dailyEarnings}/day</td>
                     <td className="py-3.5 text-slate-300">Rs {(p.dailyEarnings * 30).toLocaleString()}</td>
@@ -469,22 +528,6 @@ export const AdsView: React.FC<AdsViewProps> = ({ onGoToPlans }) => {
           rewardAmount={activeAdCampaign.reward}
           onClose={() => setActiveAdCampaign(null)}
           onCompleted={() => setActiveAdCampaign(null)}
-        />
-      )}
-
-      {/* Ad Placement & Setup Manager Modal (Jahan Ad Lagany Hain) */}
-      {isAdManagerOpen && (
-        <AdPlacementManagerModal
-          initialSlot={managerSlot}
-          onClose={() => setIsAdManagerOpen(false)}
-          onTestWatchAd={(campaign, slot) => {
-            setIsAdManagerOpen(false);
-            setActiveAdCampaign({
-              adNumber: slot,
-              campaign,
-              reward: slot === 1 ? ad1Reward : ad2Reward,
-            });
-          }}
         />
       )}
     </div>
